@@ -1,101 +1,215 @@
 import Foundation
+import AVFoundation
 
 class MusicScanner {
     let fileManager = FileManager.default
-    var rootDirectoryItem: DirectoryItem?
-    var progressHandler: ((Double) -> Void)?
-    var completionHandler: ((DirectoryItem?) -> Void)?
     
-    // 开始扫描指定目录
+    // 扫描目录
     func scanDirectory(_ url: URL, progressHandler: @escaping (Double) -> Void, completionHandler: @escaping (DirectoryItem?) -> Void) {
-        self.progressHandler = progressHandler
-        self.completionHandler = completionHandler
-        
-        // 创建根目录项
-        rootDirectoryItem = DirectoryItem(url: url, name: url.lastPathComponent)
-        
-        // 异步执行扫描
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try self.scanSubdirectory(url, parentItem: self.rootDirectoryItem!)
-                
-                DispatchQueue.main.async {
-                    progressHandler(1.0) // 扫描完成，进度100%
-                    completionHandler(self.rootDirectoryItem)
-                }
-            } catch {
-                DispatchQueue.main.async {
+            // 检查URL是否需要访问权限
+            var hasAccess = true
+            var shouldStopAccess = false
+            
+            // 如果URL是安全范围的资源，尝试请求访问权限
+            if url.startAccessingSecurityScopedResource() {
+                shouldStopAccess = true
+                hasAccess = true
+                print("成功获取目录访问权限: \(url.lastPathComponent)")
+            }
+            
+            let directoryName = url.lastPathComponent
+            let directoryItem = DirectoryItem(name: directoryName, url: url)
+            
+            // 只有在有权限的情况下才扫描
+            if hasAccess {
+                // 调用不抛出错误的scanSubdirectory方法
+                self.scanSubdirectory(url, parentItem: directoryItem)
+            } else {
+                print("无法获取目录访问权限: \(url.lastPathComponent)")
+            }
+            
+            // 释放安全范围资源的访问权限
+            if shouldStopAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            // 即使有部分文件无法访问，也返回已扫描到的结果
+            DispatchQueue.main.async {
+                progressHandler(1.0)
+                // 检查是否找到任何音乐文件或子目录，如果没有，则返回nil表示扫描无效
+                if directoryItem.musicFiles.isEmpty && directoryItem.subdirectories.isEmpty {
+                    print("未在目录中找到任何音乐文件或子目录")
                     completionHandler(nil)
+                } else {
+                    completionHandler(directoryItem)
                 }
             }
         }
     }
     
     // 递归扫描子目录
-    private func scanSubdirectory(_ url: URL, parentItem: DirectoryItem) throws {
-        let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles)
+    private func scanSubdirectory(_ url: URL, parentItem: DirectoryItem) {
+        // 尝试获取子目录的访问权限
+        var shouldStopAccess = false
         
-        for itemURL in contents {
-            let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
-            let isDirectory = resourceValues.isDirectory ?? false
+        // 如果URL是安全范围的资源，尝试请求访问权限
+        if url.startAccessingSecurityScopedResource() {
+            shouldStopAccess = true
+            print("成功获取子目录访问权限: \(url.lastPathComponent)")
+        }
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
             
-            if isDirectory {
-                // 是目录，创建DirectoryItem并递归扫描
-                let directoryItem = DirectoryItem(url: itemURL, name: itemURL.lastPathComponent)
-                parentItem.addSubdirectory(directoryItem)
-                try scanSubdirectory(itemURL, parentItem: directoryItem)
-            } else if itemURL.pathExtension.lowercased() == "mp3" {
-                // 是MP3文件，创建MusicItem
-                let musicItem = MusicItem(url: itemURL, parentDirectory: url)
-                parentItem.addMusicFile(musicItem)
+            for itemURL in contents {
+                do {
+                    // 尝试对每个项目单独请求访问权限
+                    var itemShouldStopAccess = false
+                    if itemURL.startAccessingSecurityScopedResource() {
+                        itemShouldStopAccess = true
+                    }
+                    
+                    var isDirectory: ObjCBool = false
+                    if fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDirectory) {
+                        if isDirectory.boolValue {
+                            // 是目录，创建DirectoryItem并递归扫描
+                            let directoryItem = DirectoryItem(name: itemURL.lastPathComponent, url: itemURL)
+                            directoryItem.parentDirectory = parentItem
+                            parentItem.subdirectories.append(directoryItem)
+                            // 递归扫描子目录，但不抛出错误，而是继续处理其他目录
+                            scanSubdirectory(itemURL, parentItem: directoryItem)
+                        } else if isAudioFile(itemURL) {
+                            // 是音频文件，创建MusicItem
+                            let musicItem = MusicItem(url: itemURL)
+                            musicItem.parentDirectory = parentItem
+                            
+                            // 查找同名歌词文件
+                            if let lyricsURL = findLyricsFile(for: itemURL) {
+                                musicItem.lyricsURL = lyricsURL
+                                print("找到歌词文件: \(lyricsURL.lastPathComponent)")
+                            }
+                            
+                            parentItem.musicFiles.append(musicItem)
+                        }
+                    }
+                    
+                    // 释放项目的访问权限
+                    if itemShouldStopAccess {
+                        itemURL.stopAccessingSecurityScopedResource()
+                    }
+                } catch {
+                    // 跳过无法访问的文件或目录，但继续处理其他项目
+                    print("无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                }
             }
-            
-            // 更新进度
-            DispatchQueue.main.async {
-                // 这里简化处理，实际应该计算更精确的进度
-                self.progressHandler?(0.5) // 示例进度值
-            }
+        } catch {
+            // 记录错误但不抛出，允许扫描继续处理已访问的部分
+            print("扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
+        }
+        
+        // 释放目录的访问权限
+        if shouldStopAccess {
+            url.stopAccessingSecurityScopedResource()
         }
     }
     
-    // 获取目录中所有音乐文件的扁平列表
+    // 检查是否为音频文件
+    private func isAudioFile(_ url: URL) -> Bool {
+        let audioExtensions = ["mp3", "m4a", "wav", "aac"]
+        let fileExtension = url.pathExtension.lowercased()
+        return audioExtensions.contains(fileExtension)
+    }
+    
+    // 检查是否为歌词文件
+    private func isLyricsFile(_ url: URL) -> Bool {
+        let fileExtension = url.pathExtension.lowercased()
+        return fileExtension == "lrc"
+    }
+    
+    // 查找同名歌词文件
+    private func findLyricsFile(for audioURL: URL) -> URL? {
+        let directory = audioURL.deletingLastPathComponent()
+        let filenameWithoutExtension = audioURL.deletingPathExtension().lastPathComponent
+        let lyricsURL = directory.appendingPathComponent(filenameWithoutExtension + ".lrc")
+        
+        // 尝试多种可能的文件名格式（处理可能的空格、连字符等差异）
+        let possibleLyricsFilenames = [
+            filenameWithoutExtension + ".lrc",
+            filenameWithoutExtension.trimmingCharacters(in: .whitespaces) + ".lrc"
+        ]
+        
+        for filename in possibleLyricsFilenames {
+            let possibleURL = directory.appendingPathComponent(filename)
+            
+            // 尝试获取访问权限
+            var shouldStopAccess = false
+            let hasAccess = possibleURL.startAccessingSecurityScopedResource()
+            
+            if hasAccess {
+                shouldStopAccess = true
+            }
+            
+            let fileExists = fileManager.fileExists(atPath: possibleURL.path)
+            
+            // 释放访问权限
+            if shouldStopAccess {
+                possibleURL.stopAccessingSecurityScopedResource()
+            }
+            
+            if fileExists {
+                print("找到歌词文件: \(possibleURL.lastPathComponent)")
+                return possibleURL
+            }
+        }
+        
+        // 尝试使用文件管理器的目录内容方法查找
+        do {
+            // 尝试获取目录访问权限
+            var shouldStopAccess = false
+            if directory.startAccessingSecurityScopedResource() {
+                shouldStopAccess = true
+            }
+            
+            defer { // 确保在退出作用域时释放权限
+                if shouldStopAccess {
+                    directory.stopAccessingSecurityScopedResource()
+                }
+            }
+            
+            // 获取目录内容
+            let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+            
+            // 查找匹配的lrc文件（忽略大小写和扩展名差异）
+            let baseName = filenameWithoutExtension.lowercased()
+            for fileURL in contents where fileURL.pathExtension.lowercased() == "lrc" {
+                let fileBaseName = fileURL.deletingPathExtension().lastPathComponent.lowercased()
+                
+                // 如果文件名（不包括扩展名）相同或包含歌曲名，认为是匹配的歌词文件
+                if fileBaseName == baseName || fileBaseName.contains(baseName) {
+                    print("通过模糊匹配找到歌词文件: \(fileURL.lastPathComponent) 对应歌曲: \(filenameWithoutExtension)")
+                    return fileURL
+                }
+            }
+        } catch {
+            print("扫描目录查找歌词文件时出错: \(error.localizedDescription)")
+        }
+        
+        return nil
+    }
+    
+    // 获取所有音乐文件（递归）
     func getAllMusicFiles(from directoryItem: DirectoryItem) -> [MusicItem] {
-        var allFiles: [MusicItem] = []
+        var allMusicFiles: [MusicItem] = []
         
         // 添加当前目录的音乐文件
-        allFiles.append(contentsOf: directoryItem.musicFiles)
+        allMusicFiles.append(contentsOf: directoryItem.musicFiles)
         
         // 递归获取子目录的音乐文件
         for subdirectory in directoryItem.subdirectories {
-            allFiles.append(contentsOf: getAllMusicFiles(from: subdirectory))
+            allMusicFiles.append(contentsOf: getAllMusicFiles(from: subdirectory))
         }
         
-        return allFiles
-    }
-    
-    // 获取指定目录内的音乐文件列表
-    func getMusicFilesInDirectory(_ directoryURL: URL, from rootItem: DirectoryItem) -> [MusicItem] {
-        var result: [MusicItem] = []
-        
-        // 检查是否是根目录
-        if rootItem.url == directoryURL {
-            return rootItem.musicFiles
-        }
-        
-        // 递归查找匹配的目录
-        for subdirectory in rootItem.subdirectories {
-            if subdirectory.url == directoryURL {
-                result = subdirectory.musicFiles
-                break
-            }
-            
-            let subResult = getMusicFilesInDirectory(directoryURL, from: subdirectory)
-            if !subResult.isEmpty {
-                result = subResult
-                break
-            }
-        }
-        
-        return result
+        return allMusicFiles
     }
 }

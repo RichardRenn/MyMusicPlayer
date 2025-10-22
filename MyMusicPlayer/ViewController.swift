@@ -4,6 +4,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     private let musicScanner = MusicScanner()
     private var selectedDirectoryURL: URL?
+    private var securityScopedResources: [URL] = [] // 用于跟踪需要保持访问权限的资源
     
     // UI元素
     private let titleLabel: UILabel = {
@@ -113,9 +114,20 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         present(documentPicker, animated: true, completion: nil)
     }
     
+    // 通知处理方法已移除，因为MusicListViewController现在直接处理添加文件夹的逻辑
+    
     // UIDocumentPickerDelegate 方法
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard let url = urls.first else { return }
+        
+        // 清除之前的权限记录
+        clearSecurityScopedResources()
+        
+        // 尝试获取并保持文件夹访问权限
+        if url.startAccessingSecurityScopedResource() {
+            securityScopedResources.append(url)
+            print("成功获取并保持文件夹访问权限: \(url.lastPathComponent)")
+        }
         
         selectedDirectoryURL = url
         
@@ -127,7 +139,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         // 开始扫描文件夹
         musicScanner.scanDirectory(url, progressHandler: { [weak self] progress in
             // 更新进度条和标签
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 self?.progressView.progress = Float(progress)
                 self?.progressLabel.text = "\(Int(progress * 100))%"
             }
@@ -140,11 +152,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                 self.progressLabel.isHidden = true
                 self.selectButton.isEnabled = true
                 
-                // 扫描完成，跳转到音乐列表页面
+                // 扫描完成，更新UI
                 if let rootItem = rootDirectoryItem {
+                    print("扫描完成，找到文件夹: \(rootItem.name)")
+                    
+                    // 直接跳转到音乐列表页面
                     let musicListVC = MusicListViewController(rootDirectoryItem: rootItem, scanner: self.musicScanner)
-                    musicListVC.modalPresentationStyle = .fullScreen
-                    self.present(musicListVC, animated: true, completion: nil)
+                    let navigationController = UINavigationController(rootViewController: musicListVC)
+                    navigationController.modalPresentationStyle = .fullScreen
+                    self.present(navigationController, animated: true, completion: nil)
                 } else {
                     // 扫描失败，显示错误提示
                     let alert = UIAlertController(title: "扫描失败", message: "无法扫描所选文件夹，请重试", preferredStyle: .alert)
@@ -157,5 +173,23 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
         // 用户取消了选择
+        clearSecurityScopedResources()
     }
+    
+    // 清理安全范围资源的访问权限
+    private func clearSecurityScopedResources() {
+        for url in securityScopedResources {
+            url.stopAccessingSecurityScopedResource()
+        }
+        securityScopedResources.removeAll()
+    }
+    
+    // 通知处理方法已移除，因为MusicListViewController现在直接处理添加文件夹的逻辑
+    
+    // 确保在视图控制器销毁时释放所有权限
+    deinit {
+        clearSecurityScopedResources()
+    }
+    
+
 }

@@ -1,9 +1,9 @@
 import UIKit
 
-class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate {
     
-    private let rootDirectoryItem: DirectoryItem
-    private let scanner: MusicScanner
+    private var rootDirectoryItems: [DirectoryItem] = [] // 修改为支持多个根目录
+    private var scanner: MusicScanner
     private let musicPlayer = MusicPlayer.shared
     
     // 扁平化的显示列表（用于表格视图）
@@ -68,9 +68,37 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         return button
     }()
     
-    // 初始化方法
+    private let progressView: UIProgressView = {
+        let progressView = UIProgressView()
+        progressView.translatesAutoresizingMaskIntoConstraints = false
+        return progressView
+    }()
+    
+    private let timeLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let totalTimeLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private var updateTimer: Timer? = nil
+    private var securityScopedResources: [URL] = [] // 用于跟踪需要保持访问权限的资源
+    
+    // 初始化方法 - 单目录版本
     init(rootDirectoryItem: DirectoryItem, scanner: MusicScanner) {
-        self.rootDirectoryItem = rootDirectoryItem
+        self.rootDirectoryItems = [rootDirectoryItem] // 将单个目录添加到数组中
+        self.scanner = scanner
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    // 初始化方法 - 多目录版本
+    init(rootDirectoryItems: [DirectoryItem], scanner: MusicScanner) {
+        self.rootDirectoryItems = rootDirectoryItems
         self.scanner = scanner
         super.init(nibName: nil, bundle: nil)
     }
@@ -92,6 +120,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         title = "音乐列表"
         view.backgroundColor = .systemBackground
         
+        // 设置导航栏左侧加号按钮，用于添加新文件夹
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addFolderButtonTapped))
+        
         // 设置导航栏右侧刷新按钮
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .refresh, target: self, action: #selector(refreshButtonTapped))
         
@@ -103,6 +134,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 添加底部横幅
         view.addSubview(bottomBanner)
         bottomBanner.addSubview(songTitleLabel)
+        bottomBanner.addSubview(progressView)
+        bottomBanner.addSubview(timeLabel)
+        bottomBanner.addSubview(totalTimeLabel)
         bottomBanner.addSubview(previousButton)
         bottomBanner.addSubview(playPauseButton)
         bottomBanner.addSubview(nextButton)
@@ -121,12 +155,24 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBanner.heightAnchor.constraint(equalToConstant: 80),
+            bottomBanner.heightAnchor.constraint(equalToConstant: 100),
             
             // 歌曲标题
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
             songTitleLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16),
             songTitleLabel.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 8),
+            
+            // 进度条
+            progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
+            progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16),
+            progressView.topAnchor.constraint(equalTo: songTitleLabel.bottomAnchor, constant: 4),
+            
+            // 时间标签
+            timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
+            timeLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 2),
+            
+            totalTimeLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16),
+            totalTimeLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 2),
             
             // 按钮容器
             previousButton.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 32),
@@ -174,12 +220,36 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     private func setupPlayerObservers() {
         // 监听当前播放音乐的变化
         NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        
+        // 初始化进度条和时间标签
+        progressView.progress = 0
+        progressView.tintColor = .systemBlue
+        progressView.trackTintColor = .systemGray3
+        
+        // 配置时间标签
+        timeLabel.font = UIFont.systemFont(ofSize: 12)
+        timeLabel.textColor = .secondaryLabel
+        timeLabel.text = "00:00"
+        
+        totalTimeLabel.font = UIFont.systemFont(ofSize: 12)
+        totalTimeLabel.textColor = .secondaryLabel
+        totalTimeLabel.text = "00:00"
+        
+        // 添加进度条点击手势
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(progressViewTapped(_:)))
+        progressView.addGestureRecognizer(tapGesture)
+        progressView.isUserInteractionEnabled = true
     }
     
     // 更新显示列表（扁平化树状结构）
     private func updateDisplayItems() {
         displayItems.removeAll()
-        addDirectoryToDisplayItems(rootDirectoryItem, level: 0)
+        
+        // 显示所有根目录项
+        for rootDirectoryItem in rootDirectoryItems {
+            addDirectoryToDisplayItems(rootDirectoryItem, level: 0)
+        }
+        
         tableView.reloadData()
     }
     
@@ -204,35 +274,62 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 刷新按钮点击事件
     @objc private func refreshButtonTapped() {
-        guard let directoryURL = rootDirectoryItem.url else { return }
+        if rootDirectoryItems.isEmpty {
+            // 如果没有根目录，显示提示
+            let alert = UIAlertController(title: "提示", message: "没有可刷新的文件夹", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
         
         // 显示加载提示
-        let alert = UIAlertController(title: "扫描中", message: "正在重新扫描文件夹...", preferredStyle: .alert)
+        let alert = UIAlertController(title: "扫描中", message: "正在重新扫描所有文件夹...", preferredStyle: .alert)
         present(alert, animated: true)
         
-        // 重新扫描
-        scanner.scanDirectory(directoryURL, progressHandler: { _ in
-            // 进度更新可以在这里处理
-        }, completionHandler: { [weak self] newRootItem in
-            guard let self = self else { return }
+        // 重新扫描所有根目录
+        var totalDirectories = rootDirectoryItems.count
+        var completedScans = 0
+        
+        for (index, rootItem) in rootDirectoryItems.enumerated() {
+            guard let directoryURL = rootItem.url else { continue }
             
-            DispatchQueue.main.async {
-                // 关闭加载提示
-                alert.dismiss(animated: true)
+            scanner.scanDirectory(directoryURL, progressHandler: { _ in
+                // 进度更新可以在这里处理
+            }, completionHandler: { [weak self] newRootItem in
+                guard let self = self else { return }
                 
-                // 更新显示
-                if let newRoot = newRootItem {
-                    // 更新根目录项
-                    self.rootDirectoryItem.subdirectories = newRoot.subdirectories
-                    self.rootDirectoryItem.musicFiles = newRoot.musicFiles
-                    self.updateDisplayItems()
+                DispatchQueue.main.async {
+                    // 更新对应的根目录项
+                    if let newRoot = newRootItem {
+                        self.rootDirectoryItems[index].subdirectories = newRoot.subdirectories
+                        self.rootDirectoryItems[index].musicFiles = newRoot.musicFiles
+                    }
                     
-                    // 更新播放列表
-                    let allMusicFiles = self.scanner.getAllMusicFiles(from: newRoot)
-                    self.musicPlayer.setPlaylist(allMusicFiles)
+                    completedScans += 1
+                    
+                    // 如果所有扫描都完成了
+                    if completedScans == totalDirectories {
+                        // 关闭加载提示
+                        alert.dismiss(animated: true)
+                        
+                        // 更新显示
+                        self.updateDisplayItems()
+                        
+                        // 更新播放列表 - 收集所有根目录的音乐文件
+                        var allMusicFiles: [MusicItem] = []
+                        for rootItem in self.rootDirectoryItems {
+                            allMusicFiles.append(contentsOf: self.scanner.getAllMusicFiles(from: rootItem))
+                        }
+                        self.musicPlayer.setPlaylist(allMusicFiles)
+                        
+                        // 显示成功提示
+                        let successAlert = UIAlertController(title: "成功", message: "所有文件夹已重新扫描", preferredStyle: .alert)
+                        successAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self.present(successAlert, animated: true)
+                    }
                 }
-            }
-        })
+            })
+        }
     }
     
     // 底部横幅点击事件
@@ -241,22 +338,32 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 跳转到播放详情页面
         let playerVC = MusicPlayerViewController(music: currentMusic)
-        playerVC.modalPresentationStyle = .fullScreen
-        present(playerVC, animated: true)
+        navigationController?.pushViewController(playerVC, animated: true)
     }
     
     // 底部控制按钮事件
     @objc private func previousButtonTapped() {
         musicPlayer.playPrevious()
+        // 立即更新UI
+        updatePlayerUI()
     }
     
     @objc private func playPauseButtonTapped() {
         musicPlayer.togglePlayPause()
         updatePlayerUI()
+        
+        // 根据播放状态启动或停止计时器
+        if musicPlayer.isPlaying {
+            startUpdateTimer()
+        } else {
+            stopUpdateTimer()
+        }
     }
     
     @objc private func nextButtonTapped() {
         musicPlayer.playNext()
+        // 立即更新UI
+        updatePlayerUI()
     }
     
     @objc private func playModeButtonTapped() {
@@ -274,6 +381,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let currentMusic = musicPlayer.currentMusic {
             bottomBanner.isHidden = false
             songTitleLabel.text = currentMusic.title
+            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
             
             // 更新播放/暂停按钮
             let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
@@ -284,8 +392,20 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             
             // 更新范围锁定按钮
             updateRangeLockButtonImage()
+            
+            // 更新进度条
+            progressView.progress = Float(musicPlayer.currentTime / musicPlayer.totalTime)
+            timeLabel.text = formatTime(musicPlayer.currentTime)
+            
+            // 根据播放状态启动或停止计时器
+            if musicPlayer.isPlaying {
+                startUpdateTimer()
+            } else {
+                stopUpdateTimer()
+            }
         } else {
             bottomBanner.isHidden = true
+            stopUpdateTimer()
         }
     }
     
@@ -305,10 +425,144 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         playModeButton.setImage(UIImage(systemName: imageName), for: .normal)
     }
     
+    // 启动更新计时器
+    private func startUpdateTimer() {
+        stopUpdateTimer() // 先停止之前的计时器
+        updateTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
+    }
+    
+    // 停止更新计时器
+    private func stopUpdateTimer() {
+        updateTimer?.invalidate()
+        updateTimer = nil
+    }
+    
+    // 更新进度
+    @objc private func updateProgress() {
+        let progress = musicPlayer.currentTime / musicPlayer.totalTime
+        progressView.progress = Float(progress)
+        timeLabel.text = formatTime(musicPlayer.currentTime)
+    }
+    
+    // 格式化时间
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time / 60)
+        let seconds = Int(time.truncatingRemainder(dividingBy: 60))
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    // 进度条点击事件处理
+    @objc private func progressViewTapped(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: progressView)
+        let progress = location.x / progressView.bounds.width
+        let seekTime = TimeInterval(progress) * musicPlayer.totalTime
+        musicPlayer.seek(to: seekTime)
+        
+        // 立即更新UI
+        progressView.progress = Float(progress)
+        timeLabel.text = formatTime(seekTime)
+    }
+    
     // 更新范围锁定按钮图标
     private func updateRangeLockButtonImage() {
         let imageName = musicPlayer.isRangeLocked ? "lock.fill" : "lock.open.fill"
         rangeLockButton.setImage(UIImage(systemName: imageName), for: .normal)
+    }
+    
+    // 添加文件夹按钮点击事件
+    @objc private func addFolderButtonTapped() {
+        let documentPicker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        documentPicker.delegate = self
+        documentPicker.allowsMultipleSelection = false
+        
+        // iOS 14及以上支持文件夹选择
+        if #available(iOS 14, *) {
+            documentPicker.directoryURL = nil
+        }
+        
+        present(documentPicker, animated: true, completion: nil)
+    }
+    
+    // UIDocumentPickerDelegate 方法
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        
+        // 请求访问权限
+        guard url.startAccessingSecurityScopedResource() else {
+            let alert = UIAlertController(title: "错误", message: "无法获取文件夹访问权限", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        // 将权限记录添加到数组中以便稍后释放
+        securityScopedResources.append(url)
+        
+        // 显示加载提示
+        let alert = UIAlertController(title: "扫描中", message: "正在扫描文件夹...", preferredStyle: .alert)
+        present(alert, animated: true)
+        
+        // 扫描文件夹内容
+        scanner.scanDirectory(url, progressHandler: { _ in
+            // 进度更新可以在这里处理
+        }, completionHandler: { [weak self] newRootItem in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                // 关闭加载提示
+                alert.dismiss(animated: true)
+                
+                // 检查是否已存在同名文件夹
+                if let newRoot = newRootItem {
+                    let isDuplicate = self.rootDirectoryItems.contains {
+                        $0.name == newRoot.name && $0.url == newRoot.url
+                    }
+                    
+                    if !isDuplicate {
+                        // 添加到根目录列表
+                        self.rootDirectoryItems.append(newRoot)
+                        print("成功添加新的根目录: \(newRoot.name)")
+                        
+                        // 更新UI显示
+                        self.updateDisplayItems()
+                        
+                        // 显示成功提示
+                        let successAlert = UIAlertController(title: "成功", message: "文件夹已添加到列表", preferredStyle: .alert)
+                        successAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self.present(successAlert, animated: true)
+                    } else {
+                        // 显示重复提示
+                        let duplicateAlert = UIAlertController(title: "提示", message: "该文件夹已存在", preferredStyle: .alert)
+                        duplicateAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self.present(duplicateAlert, animated: true)
+                    }
+                } else {
+                    // 扫描失败
+                    let errorAlert = UIAlertController(title: "错误", message: "无法扫描文件夹内容", preferredStyle: .alert)
+                    errorAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                    self.present(errorAlert, animated: true)
+                }
+            }
+        })
+    }
+    
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        // 用户取消了选择
+        // 不需要特殊处理
+    }
+    
+    // 清理安全范围资源的访问权限
+    private func clearSecurityScopedResources() {
+        for url in securityScopedResources {
+            url.stopAccessingSecurityScopedResource()
+        }
+        securityScopedResources.removeAll()
+    }
+    
+    // 析构函数
+    deinit {
+        stopUpdateTimer()
+        clearSecurityScopedResources()
     }
     
     // UITableViewDataSource 方法
@@ -382,7 +636,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             updateDisplayItems()
         } else if let (musicFile, _) = item as? (MusicItem, Int) {
             // 点击的是音乐文件，开始播放
-            let allMusicFiles = scanner.getAllMusicFiles(from: rootDirectoryItem)
+            // 收集所有根目录的音乐文件
+            var allMusicFiles: [MusicItem] = []
+            for rootItem in rootDirectoryItems {
+                allMusicFiles.append(contentsOf: scanner.getAllMusicFiles(from: rootItem))
+            }
             musicPlayer.setPlaylist(allMusicFiles)
             
             if let index = allMusicFiles.firstIndex(where: { $0.url == musicFile.url }) {

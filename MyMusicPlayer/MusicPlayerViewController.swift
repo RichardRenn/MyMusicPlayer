@@ -1,8 +1,11 @@
 import UIKit
+import Foundation
+import AVFoundation
+import MediaPlayer
 
 class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     
-    private let music: MusicItem
+    private var music: MusicItem
     private let musicPlayer = MusicPlayer.shared
     private var lyrics: [LyricsLine] = []
     private var currentLyricIndex: Int = 0
@@ -102,12 +105,44 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         setupUI()
         loadLyrics()
         setupButtonActions()
+        setupPlayerObservers()
         startUpdateTimer()
         updateUI()
     }
     
     deinit {
         stopUpdateTimer()
+        // 移除通知监听
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("PlayerStateChanged"), object: nil)
+    }
+    
+    // 设置播放器观察者
+    private func setupPlayerObservers() {
+        // 监听当前播放音乐的变化
+        NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: NSNotification.Name("PlayerStateChanged"), object: nil)
+    }
+    
+    // 更新播放器UI
+    @objc private func updatePlayerUI() {
+        // 更新标题
+        if let currentMusic = musicPlayer.currentMusic {
+            title = currentMusic.title
+            self.music = currentMusic // 更新当前控制器的music引用
+            
+            // 重新加载歌词
+            loadLyrics()
+            
+            // 更新播放/暂停按钮
+            let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
+            playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
+            
+            // 更新播放模式和范围锁定按钮
+            updatePlayModeButtonImage()
+            updateRangeLockButtonImage()
+            
+            // 更新进度显示
+            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
+        }
     }
     
     // 设置UI
@@ -122,6 +157,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         view.addSubview(tableView)
         tableView.delegate = self
         tableView.dataSource = self
+        // 注册表格单元格
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "lyricCell")
         
         // 添加底部控制栏
         view.addSubview(bottomControls)
@@ -204,21 +241,79 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     // 加载歌词
     private func loadLyrics() {
-        if let musicLyrics = music.lyrics {
-            lyrics = musicLyrics
-        } else if let lyricsURL = music.lyricsURL {
-            if let parsedLyrics = LyricsParser.parseLyrics(from: lyricsURL) {
-                lyrics = parsedLyrics
-                music.lyrics = parsedLyrics
+        print("===== 开始加载歌词 =====")
+        // 清空之前的歌词
+        lyrics.removeAll()
+        
+        // 先尝试使用已有的歌词缓存
+        if !music.lyrics.isEmpty {
+            print("使用已缓存的歌词数据，共\(music.lyrics.count)行")
+            lyrics = music.lyrics
+        } 
+        // 尝试从文件加载歌词
+        else if let lyricsURL = music.lyricsURL {
+            print("尝试从文件加载歌词: \(lyricsURL.lastPathComponent)")
+            print("歌词文件路径: \(lyricsURL.path)")
+            
+            // 检查文件是否存在
+            if FileManager.default.fileExists(atPath: lyricsURL.path) {
+                print("歌词文件存在")
+            } else {
+                print("歌词文件不存在于路径: \(lyricsURL.path)")
             }
+            
+            // 为歌词加载添加访问权限处理
+            var shouldStopAccess = false
+            if lyricsURL.startAccessingSecurityScopedResource() {
+                shouldStopAccess = true
+                print("成功获取歌词文件临时访问权限")
+            } else {
+                print("未能获取歌词文件临时访问权限")
+            }
+            
+            // 尝试解析歌词
+            if let parsedLyrics = LyricsParser.parseLyrics(from: lyricsURL) {
+                if !parsedLyrics.isEmpty {
+                    lyrics = parsedLyrics
+                    music.lyrics = parsedLyrics // 缓存解析结果
+                    print("成功解析歌词，共\(lyrics.count)行")
+                } else {
+                    print("歌词文件存在但内容为空或格式错误")
+                }
+            } else {
+                print("解析歌词文件失败")
+            }
+            
+            // 释放访问权限
+            if shouldStopAccess {
+                lyricsURL.stopAccessingSecurityScopedResource()
+                print("已释放歌词文件访问权限")
+            }
+        } else {
+            print("音乐项没有关联的歌词URL")
         }
         
         // 如果没有歌词，添加默认文本
         if lyrics.isEmpty {
-            lyrics.append(LyricsLine(time: 0, text: "暂无歌词"))
+            if music.lyricsURL != nil {
+                // 有歌词文件路径但未能成功加载
+                lyrics.append(LyricsLine(time: 0, text: "无法加载歌词文件"))
+                lyrics.append(LyricsLine(time: 1, text: "可能是文件格式不兼容或权限问题"))
+            } else {
+                // 没有歌词文件
+                lyrics.append(LyricsLine(time: 0, text: "暂无歌词"))
+            }
         }
         
-        tableView.reloadData()
+        // 刷新表格显示
+        print("准备刷新表格，当前歌词数量: \(lyrics.count)")
+        DispatchQueue.main.async {
+            print("在主线程执行表格刷新")
+            self.tableView.reloadData()
+            print("表格刷新完成")
+        }
+        
+        print("===== 歌词加载结束 =====")
     }
     
     // 启动更新计时器
@@ -310,11 +405,14 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     // 按钮点击事件处理
     @objc private func closeButtonTapped() {
-        dismiss(animated: true)
+        // 使用popViewController返回上一个页面，而不是dismiss
+        navigationController?.popViewController(animated: true)
     }
     
     @objc private func previousButtonTapped() {
         musicPlayer.playPrevious()
+        // 立即更新UI（虽然playMusic方法会发送通知，但这里添加冗余调用确保UI立即响应）
+        updatePlayerUI()
     }
     
     @objc private func playPauseButtonTapped() {
@@ -323,6 +421,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     @objc private func nextButtonTapped() {
         musicPlayer.playNext()
+        // 立即更新UI（虽然playMusic方法会发送通知，但这里添加冗余调用确保UI立即响应）
+        updatePlayerUI()
     }
     
     @objc private func playModeButtonTapped() {

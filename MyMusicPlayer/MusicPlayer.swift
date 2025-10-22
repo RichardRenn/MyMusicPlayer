@@ -1,5 +1,66 @@
-import AVFoundation
 import Foundation
+import AVFoundation
+
+// 基础类型定义
+struct LyricsLine {
+    let time: TimeInterval
+    let text: String
+    
+    init(time: TimeInterval, text: String) {
+        self.time = time
+        self.text = text
+    }
+}
+
+class DirectoryItem: Equatable {
+    let url: URL?
+    let name: String
+    weak var parentDirectory: DirectoryItem?
+    var subdirectories: [DirectoryItem] = []
+    var musicFiles: [MusicItem] = []
+    var isExpanded: Bool = false
+    
+    init(name: String, url: URL) {
+        self.name = name
+        self.url = url
+    }
+    
+    init(url: URL, name: String) {
+        self.url = url
+        self.name = name
+    }
+    
+    static func == (lhs: DirectoryItem, rhs: DirectoryItem) -> Bool {
+        return lhs.url == rhs.url
+    }
+}
+
+class MusicItem {
+    let url: URL
+    var title: String
+    var artist: String
+    var album: String
+    var duration: TimeInterval
+    weak var parentDirectory: DirectoryItem?
+    var lyricsURL: URL?
+    var lyrics: [LyricsLine] = []
+    
+    init(url: URL) {
+        self.url = url
+        self.title = url.lastPathComponent
+        self.artist = "Unknown Artist"
+        self.album = "Unknown Album"
+        self.duration = 0
+    }
+    
+    init(title: String, artist: String, album: String, duration: TimeInterval, filePath: String) {
+        self.url = URL(fileURLWithPath: filePath)
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.duration = duration
+    }
+}
 
 // 播放模式枚举
 enum PlayMode {
@@ -70,11 +131,16 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         
         // 加载歌词
         if let lyricsURL = music.lyricsURL {
-            music.lyrics = LyricsParser.parseLyrics(from: lyricsURL)
+            if let lyrics = LyricsParser.parseLyrics(from: lyricsURL) {
+                music.lyrics = lyrics
+            }
         }
         
         // 播放音乐
         playAudio(music.url)
+        
+        // 发送播放器状态改变通知，让所有监听的视图控制器更新UI
+        NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
     }
     
     // 更新当前目录播放列表
@@ -88,8 +154,19 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         }
     }
     
+    // 用于跟踪需要保持访问权限的资源
+    private var securityScopedResources: [URL] = []
+    
     // 播放音频文件
     private func playAudio(_ url: URL) {
+        // 尝试获取文件访问权限
+        var shouldStopAccess = false
+        if url.startAccessingSecurityScopedResource() {
+            shouldStopAccess = true
+            securityScopedResources.append(url)
+            print("成功获取音频文件访问权限: \(url.lastPathComponent)")
+        }
+        
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
@@ -104,6 +181,13 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         } catch {
             print("播放音乐失败: \(error)")
             isPlaying = false
+            
+            // 如果播放失败，释放访问权限
+            if shouldStopAccess {
+                url.stopAccessingSecurityScopedResource()
+                // 从跟踪列表中移除
+                securityScopedResources.removeAll { $0 == url }
+            }
         }
     }
     
@@ -125,6 +209,14 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     // 更新播放进度
     @objc private func updateProgress() {
         currentTime = audioPlayer?.currentTime ?? 0
+    }
+    
+    // 清理安全范围资源的访问权限
+    private func clearSecurityScopedResources() {
+        for url in securityScopedResources {
+            url.stopAccessingSecurityScopedResource()
+        }
+        securityScopedResources.removeAll()
     }
     
     // 播放/暂停
@@ -262,7 +354,11 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     }
     
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        print("音频解码错误: \(error?.localizedDescription ?? \"未知错误\")")
+        if let err = error {
+            print("音频解码错误: \(err.localizedDescription)")
+        } else {
+            print("音频解码错误: 未知错误")
+        }
         isPlaying = false
     }
     
@@ -275,6 +371,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     // 清理资源
     deinit {
         stopProgressTimer()
+        clearSecurityScopedResources()
         audioPlayer?.stop()
         audioPlayer = nil
     }
