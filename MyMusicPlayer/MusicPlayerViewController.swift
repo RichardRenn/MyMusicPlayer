@@ -3,6 +3,12 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 
+// 定义通知名称
+extension Notification.Name {
+    static let musicPlayerPlaybackStateChanged = Notification.Name("musicPlayerPlaybackStateChanged")
+    static let musicPlayerProgressChanged = Notification.Name("musicPlayerProgressChanged")
+}
+
 class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     
     private var music: MusicItem
@@ -28,10 +34,32 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         return view
     }()
     
+    private let progressSlider: UISlider = {
+        let slider = UISlider()
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        slider.minimumValue = 0.0
+        slider.maximumValue = 1.0
+        slider.minimumTrackTintColor = .systemBlue
+        slider.maximumTrackTintColor = .systemGray3
+        slider.thumbTintColor = .systemBlue
+        
+        // 自定义滑块外观为小方块
+        let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
+            UIColor.systemBlue.setFill()
+            let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
+            context.fill(rect)
+        }
+        slider.setThumbImage(thumbImage, for: .normal)
+        slider.setThumbImage(thumbImage, for: .highlighted)
+        
+        return slider
+    }()
+    
+    // 保留原来的进度视图作为背景指示器（可选，默认隐藏）
     private let progressView: UIProgressView = {
-        let progressView = UIProgressView(progressViewStyle: .default)
-        progressView.progress = 0
+        let progressView = UIProgressView()
         progressView.translatesAutoresizingMaskIntoConstraints = false
+        progressView.isHidden = true // 隐藏，因为我们将使用滑块
         return progressView
     }()
     
@@ -162,14 +190,20 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 添加底部控制栏
         view.addSubview(bottomControls)
-        bottomControls.addSubview(progressView)
+        bottomControls.addSubview(progressView) // 保留但隐藏
+        bottomControls.addSubview(progressSlider) // 添加滑块
         bottomControls.addSubview(timeLabel)
         bottomControls.addSubview(totalTimeLabel)
-        bottomControls.addSubview(previousButton)
-        bottomControls.addSubview(playPauseButton)
-        bottomControls.addSubview(nextButton)
-        bottomControls.addSubview(playModeButton)
-        bottomControls.addSubview(rangeLockButton)
+        
+        // 创建合并的按钮容器StackView，实现居中显示
+        let allButtonsStack = UIStackView(arrangedSubviews: [previousButton, playPauseButton, nextButton, playModeButton, rangeLockButton])
+        allButtonsStack.translatesAutoresizingMaskIntoConstraints = false
+        allButtonsStack.axis = .horizontal
+        allButtonsStack.alignment = .center
+        allButtonsStack.distribution = .equalSpacing
+        allButtonsStack.spacing = 20
+        
+        bottomControls.addSubview(allButtonsStack)
         
         // 设置约束
         NSLayoutConstraint.activate([
@@ -183,51 +217,53 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             bottomControls.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomControls.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomControls.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomControls.heightAnchor.constraint(equalToConstant: 120),
+            bottomControls.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 改为屏幕高度的15%
             
-            // 进度条
-            progressView.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16),
-            progressView.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16),
-            progressView.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 8),
+            // 进度条（隐藏）
+            progressView.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
+            progressView.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
+            progressView.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 12), // 顶部12像素边距
+            
+            // 进度滑块
+            progressSlider.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
+            progressSlider.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
+            progressSlider.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 12), // 顶部12像素边距
+
             
             // 时间标签
-            timeLabel.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16),
-            timeLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 4),
+            timeLabel.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
+            timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 进度滑块下方4像素
             
-            totalTimeLabel.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16),
-            totalTimeLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 4),
+            totalTimeLabel.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
+            totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 进度滑块下方4像素
             
-            // 控制按钮
-            previousButton.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 32),
-            previousButton.centerYAnchor.constraint(equalTo: bottomControls.centerYAnchor, constant: 20),
-            previousButton.widthAnchor.constraint(equalToConstant: 40),
-            previousButton.heightAnchor.constraint(equalToConstant: 40),
+            // 合并的按钮组 - 居中显示
+            allButtonsStack.centerXAnchor.constraint(equalTo: bottomControls.centerXAnchor),
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomControls.bottomAnchor, constant: -8), // 底部8像素边距
+            allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomControls.widthAnchor, constant: -32), // 两侧各16像素边距
             
-            playPauseButton.leadingAnchor.constraint(equalTo: previousButton.trailingAnchor, constant: 24),
-            playPauseButton.centerYAnchor.constraint(equalTo: bottomControls.centerYAnchor, constant: 20),
-            playPauseButton.widthAnchor.constraint(equalToConstant: 50),
-            playPauseButton.heightAnchor.constraint(equalToConstant: 50),
+            // 按钮大小约束
+            previousButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            previousButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
             
-            nextButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: 24),
-            nextButton.centerYAnchor.constraint(equalTo: bottomControls.centerYAnchor, constant: 20),
-            nextButton.widthAnchor.constraint(equalToConstant: 40),
-            nextButton.heightAnchor.constraint(equalToConstant: 40),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.35),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.35),
             
-            playModeButton.trailingAnchor.constraint(equalTo: rangeLockButton.leadingAnchor, constant: -24),
-            playModeButton.centerYAnchor.constraint(equalTo: bottomControls.centerYAnchor, constant: 20),
-            playModeButton.widthAnchor.constraint(equalToConstant: 40),
-            playModeButton.heightAnchor.constraint(equalToConstant: 40),
+            nextButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            nextButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
             
-            rangeLockButton.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -32),
-            rangeLockButton.centerYAnchor.constraint(equalTo: bottomControls.centerYAnchor, constant: 20),
-            rangeLockButton.widthAnchor.constraint(equalToConstant: 40),
-            rangeLockButton.heightAnchor.constraint(equalToConstant: 40)
+            playModeButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            playModeButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28)
         ])
         
-        // 添加进度条点击手势
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(progressViewTapped(_:)))
-        progressView.addGestureRecognizer(tapGesture)
-        progressView.isUserInteractionEnabled = true
+        // 添加进度滑块事件
+        progressSlider.addTarget(self, action: #selector(progressSliderValueChanged(_:)), for: .valueChanged)
+        progressSlider.addTarget(self, action: #selector(progressSliderTouchBegan(_:)), for: .touchDown)
+        progressSlider.addTarget(self, action: #selector(progressSliderTouchEnded(_:)), for: .touchUpInside)
+        progressSlider.addTarget(self, action: #selector(progressSliderTouchEnded(_:)), for: .touchUpOutside)
     }
     
     // 设置按钮点击事件
@@ -327,18 +363,24 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         updateTimer = nil
     }
     
+    private var isSeeking = false // 标记是否正在手动拖动滑块
+    
     // 更新进度
     @objc private func updateProgress() {
-        // 更新进度条
-        let progress = musicPlayer.currentTime / musicPlayer.totalTime
-        progressView.progress = Float(progress)
-        
-        // 更新时间标签
-        timeLabel.text = formatTime(musicPlayer.currentTime)
-        totalTimeLabel.text = formatTime(musicPlayer.totalTime)
-        
-        // 更新歌词显示
-        updateLyricDisplay()
+        // 只有当用户不在拖动滑块时才更新UI
+        if !isSeeking {
+            // 更新进度条和滑块
+            let progress = musicPlayer.currentTime / musicPlayer.totalTime
+            progressView.progress = Float(progress)
+            progressSlider.value = Float(progress)
+            
+            // 更新时间标签
+            timeLabel.text = formatTime(musicPlayer.currentTime)
+            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
+            
+            // 更新歌词显示
+            updateLyricDisplay()
+        }
         
         // 更新播放/暂停按钮
         let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
@@ -435,11 +477,34 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         updateRangeLockButtonImage()
     }
     
-    @objc private func progressViewTapped(_ gesture: UITapGestureRecognizer) {
-        let location = gesture.location(in: progressView)
-        let progress = location.x / progressView.bounds.width
-        let seekTime = TimeInterval(progress) * musicPlayer.totalTime
+    // 进度滑块值变化事件处理
+    @objc private func progressSliderValueChanged(_ slider: UISlider) {
+        // 更新时间标签显示
+        let seekTime = TimeInterval(slider.value) * musicPlayer.totalTime
+        timeLabel.text = formatTime(seekTime)
+    }
+    
+    // 滑块触摸开始
+    @objc private func progressSliderTouchBegan(_ slider: UISlider) {
+        isSeeking = true
+    }
+    
+    // 滑块触摸结束，执行跳转
+    @objc private func progressSliderTouchEnded(_ slider: UISlider) {
+        isSeeking = false
+        // 执行跳转
+        let seekTime = TimeInterval(slider.value) * musicPlayer.totalTime
         musicPlayer.seek(to: seekTime)
+        
+        // 立即更新UI
+        progressView.progress = slider.value
+        timeLabel.text = formatTime(seekTime)
+        
+        // 更新歌词显示
+        updateLyricDisplay()
+        
+        // 发送通知，通知其他页面（如MusicListViewController）更新滑块位置
+        NotificationCenter.default.post(name: .musicPlayerProgressChanged, object: nil, userInfo: ["currentTime": seekTime, "totalTime": musicPlayer.totalTime])
     }
     
     // UITableViewDataSource 方法
