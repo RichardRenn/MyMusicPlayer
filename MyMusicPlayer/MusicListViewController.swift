@@ -10,7 +10,41 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 扁平化的显示列表（用于表格视图）
     private var displayItems: [Any] = []
     
+    // 歌词相关
+    private var isLyricsExpanded = false
+    private var lyrics: [LyricsLine] = []
+    private var currentLyricIndex = 0
+    
     // UI元素
+    // 展开/收起歌词按钮
+    private let expandButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "chevron.up"), for: .normal)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.backgroundColor = .secondarySystemBackground
+        button.layer.cornerRadius = 8
+        return button
+    }()
+    
+    // 歌词面板
+    private let lyricsPanel: UIView = {
+        let view = UIView()
+        view.backgroundColor = .secondarySystemBackground
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    // 歌词表格视图
+    private let lyricsTableView: UITableView = {
+        let tableView = UITableView()
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "lyricCell")
+        tableView.backgroundColor = .clear
+        tableView.separatorStyle = .none
+        return tableView
+    }()
+    
     private let tableView: UITableView = {
         let tableView = UITableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -161,6 +195,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         tableView.delegate = self
         tableView.dataSource = self
         
+        // 添加歌词面板
+        view.addSubview(lyricsPanel)
+        lyricsPanel.addSubview(lyricsTableView)
+        lyricsTableView.delegate = self
+        lyricsTableView.dataSource = self
+        lyricsTableView.register(UITableViewCell.self, forCellReuseIdentifier: "lyricCell")
+        
+        // 添加展开/收起按钮
+        view.addSubview(expandButton)
+        expandButton.isHidden = true // 初始状态隐藏展开按钮
+        
         // 添加底部横幅
         view.addSubview(bottomBanner)
         bottomBanner.addSubview(songTitleLabel)
@@ -188,7 +233,25 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: expandButton.topAnchor),
+            
+            // 展开/收起按钮
+            expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            expandButton.widthAnchor.constraint(equalToConstant: 40),
+            expandButton.heightAnchor.constraint(equalToConstant: 20),
+            expandButton.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor),
+            
+            // 歌词面板
+            lyricsPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            lyricsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            lyricsPanel.bottomAnchor.constraint(equalTo: expandButton.topAnchor),
+            lyricsPanel.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.3), // 歌词面板高度为屏幕的30%
+            
+            // 歌词表格视图
+            lyricsTableView.topAnchor.constraint(equalTo: lyricsPanel.topAnchor),
+            lyricsTableView.leadingAnchor.constraint(equalTo: lyricsPanel.leadingAnchor),
+            lyricsTableView.trailingAnchor.constraint(equalTo: lyricsPanel.trailingAnchor),
+            lyricsTableView.bottomAnchor.constraint(equalTo: lyricsPanel.bottomAnchor),
             
             // 底部横幅 - 高度改为屏幕高度的15%
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -247,6 +310,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         setupPlayerObservers()
         setupButtonActions()
+        
+        // 设置展开/收起按钮的点击事件
+        expandButton.addTarget(self, action: #selector(toggleLyricsPanel), for: .touchUpInside)
     }
     
     // 设置按钮点击事件
@@ -422,10 +488,120 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     private var isSeeking = false // 标记是否正在手动拖动滑块
     
+    // 切换歌词面板展开/收起状态
+    @objc private func toggleLyricsPanel() {
+        isLyricsExpanded.toggle()
+        
+        // 更新按钮图标
+        let imageName = isLyricsExpanded ? "chevron.down" : "chevron.up"
+        expandButton.setImage(UIImage(systemName: imageName), for: .normal)
+        
+        // 显示或隐藏歌词面板
+        lyricsPanel.isHidden = !isLyricsExpanded
+        
+        // 加载歌词
+        if isLyricsExpanded {
+            loadLyrics()
+        }
+    }
+    
+    // 加载歌词
+    private func loadLyrics() {
+        print("===== 开始加载歌词 =====")
+        // 清空之前的歌词
+        lyrics.removeAll()
+        currentLyricIndex = 0
+        
+        if let currentMusic = musicPlayer.currentMusic {
+            // 先尝试使用已有的歌词缓存
+            if !currentMusic.lyrics.isEmpty {
+                print("使用已缓存的歌词数据，共\(currentMusic.lyrics.count)行")
+                lyrics = currentMusic.lyrics
+            } 
+            // 尝试从文件加载歌词
+            else if let lyricsURL = currentMusic.lyricsURL {
+                print("尝试从文件加载歌词: \(lyricsURL.lastPathComponent)")
+                print("歌词文件路径: \(lyricsURL.path)")
+                
+                // 检查文件是否存在
+                if FileManager.default.fileExists(atPath: lyricsURL.path) {
+                    print("歌词文件存在")
+                } else {
+                    print("歌词文件不存在于路径: \(lyricsURL.path)")
+                }
+                
+                // 为歌词加载添加访问权限处理
+                var shouldStopAccess = false
+                if lyricsURL.startAccessingSecurityScopedResource() {
+                    shouldStopAccess = true
+                    print("成功获取歌词文件临时访问权限")
+                } else {
+                    print("未能获取歌词文件临时访问权限")
+                }
+                
+                // 尝试解析歌词
+                if let parsedLyrics = LyricsParser.parseLyrics(from: lyricsURL) {
+                    if !parsedLyrics.isEmpty {
+                        lyrics = parsedLyrics
+                        currentMusic.lyrics = parsedLyrics // 缓存解析结果
+                        print("成功解析歌词，共\(lyrics.count)行")
+                    } else {
+                        print("歌词文件存在但内容为空或格式错误")
+                    }
+                } else {
+                    print("解析歌词文件失败")
+                }
+                
+                // 释放访问权限
+                if shouldStopAccess {
+                    lyricsURL.stopAccessingSecurityScopedResource()
+                    print("已释放歌词文件访问权限")
+                }
+            } else {
+                print("音乐项没有关联的歌词URL")
+            }
+            
+            // 如果没有歌词，添加默认文本
+            if lyrics.isEmpty {
+                if currentMusic.lyricsURL != nil {
+                    // 有歌词文件路径但未能成功加载
+                    lyrics.append(LyricsLine(time: 0, text: "无法加载歌词文件"))
+                    lyrics.append(LyricsLine(time: 1, text: "可能是文件格式不兼容或权限问题"))
+                } else {
+                    // 没有歌词文件
+                    lyrics.append(LyricsLine(time: 0, text: "暂无歌词"))
+                }
+            }
+        } else {
+            // 默认歌词
+            lyrics = [
+                LyricsLine(time: 0, text: "暂无歌曲播放"),
+                LyricsLine(time: 5, text: "请选择一首歌曲开始播放")
+            ]
+        }
+        
+        // 刷新表格显示
+        print("准备刷新表格，当前歌词数量: \(lyrics.count)")
+        DispatchQueue.main.async {
+            print("在主线程执行表格刷新")
+            self.lyricsTableView.reloadData()
+            
+            // 初始滚动到第一行歌词
+            if !self.lyrics.isEmpty {
+                self.lyricsTableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .middle, animated: false)
+            }
+            
+            print("表格刷新完成")
+        }
+        
+        print("===== 歌词加载结束 =====")
+    }
+    
     // 更新播放器UI
     @objc private func updatePlayerUI() {
         if let currentMusic = musicPlayer.currentMusic {
             bottomBanner.isHidden = false
+            expandButton.isHidden = false // 有歌曲播放时显示展开按钮
             songTitleLabel.text = currentMusic.title
             totalTimeLabel.text = formatTime(musicPlayer.totalTime)
             
@@ -454,8 +630,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             } else {
                 stopUpdateTimer()
             }
+            
+            // 如果歌词面板是展开的，重新加载歌词
+            if isLyricsExpanded {
+                loadLyrics()
+            }
         } else {
             bottomBanner.isHidden = true
+            expandButton.isHidden = true // 没有歌曲播放时隐藏展开按钮
             stopUpdateTimer()
         }
     }
@@ -496,6 +678,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             progressView.progress = Float(progress)
             progressSlider.value = Float(progress) // 同时更新滑块位置
             timeLabel.text = formatTime(musicPlayer.currentTime)
+            
+            // 更新歌词高亮显示
+            updateCurrentLyricIndex()
         }
     }
     
@@ -661,10 +846,42 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // UITableViewDataSource 方法
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if tableView == lyricsTableView {
+            return lyrics.count
+        }
         return displayItems.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if tableView == lyricsTableView {
+            // 处理歌词单元格
+            let cell = tableView.dequeueReusableCell(withIdentifier: "lyricCell", for: indexPath)
+            cell.backgroundColor = .clear
+            
+            let lyricLine = lyrics[indexPath.row]
+            var content = cell.defaultContentConfiguration()
+            content.text = lyricLine.text
+            
+            // 设置文本居中对齐
+            content.textProperties.alignment = .center
+            
+            // 当前播放的歌词行高亮显示
+            if indexPath.row == currentLyricIndex {
+                content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+                content.textProperties.color = .systemBlue
+            } else {
+                content.textProperties.font = UIFont.systemFont(ofSize: 16)
+                content.textProperties.color = .secondaryLabel
+            }
+            
+            cell.contentConfiguration = content
+            cell.textLabel?.textAlignment = .center
+            cell.selectionStyle = .none
+            
+            return cell
+        }
+        
+        // 处理音乐列表单元格
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
         
         // 获取显示项
@@ -722,6 +939,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
+        // 检查是否是歌词表格
+        if tableView == lyricsTableView {
+            // 歌词表格不需要处理点击事件
+            return
+        }
+        
         let item = displayItems[indexPath.row]
         
         if let (directory, _) = item as? (DirectoryItem, Int) {
@@ -740,7 +963,38 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             if let index = allMusicFiles.firstIndex(where: { $0.url == musicFile.url }) {
                 musicPlayer.playMusic(musicFile, at: index)
                 updatePlayerUI()
+                
+                // 如果歌词面板是展开的，重新加载歌词
+                if isLyricsExpanded {
+                    loadLyrics()
+                }
             }
         }
     }
+    
+
+    
+    // 处理歌词滚动，高亮当前播放的歌词
+    private func updateCurrentLyricIndex() {
+        guard !lyrics.isEmpty, musicPlayer.isPlaying else { return }
+        
+        let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
+        
+        if newIndex != currentLyricIndex {
+            currentLyricIndex = newIndex
+            
+            // 如果歌词面板是展开的，更新UI
+            if isLyricsExpanded {
+                DispatchQueue.main.async {
+                    self.lyricsTableView.reloadData()
+                    
+                    // 自动滚动到当前歌词
+                    let indexPath = IndexPath(row: self.currentLyricIndex, section: 0)
+                    self.lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
+                }
+            }
+        }
+    }
+    
+    // 在updateProgress方法中调用updateCurrentLyricIndex来更新歌词显示
 }

@@ -51,7 +51,7 @@ class LyricsParser {
     // 解析歌词内容
     static func parseLyrics(content: String) -> [LyricsLine] {
         // 打印原始歌词内容前100个字符用于调试
-        print("原始歌词文件内容开始 (前100字符): \(content.prefix(100))...")
+        // print("原始歌词文件内容开始 (前100字符): \(content.prefix(100))...")
         
         var lyrics: [LyricsLine] = []
         
@@ -65,7 +65,7 @@ class LyricsParser {
         for line in lines {
             let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedLine.isEmpty {
-                print("跳过空行")
+                // print("跳过空行")
                 continue
             }
             
@@ -73,7 +73,7 @@ class LyricsParser {
             let matches = timeRegex.matches(in: trimmedLine, range: NSRange(trimmedLine.startIndex..., in: trimmedLine))
             
             if matches.isEmpty {
-                print("跳过没有时间标签的行: \(trimmedLine)")
+                // print("跳过没有时间标签的行: \(trimmedLine)")
                 continue
             }
             
@@ -87,18 +87,18 @@ class LyricsParser {
             }
             text = text.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            print("提取到文本: \(text.isEmpty ? "[空]" : text)")
+            // print("提取到文本: \(text.isEmpty ? "[空]" : text)")
             
-            // 检查是否是元数据行（如作词、作曲、编曲等），如果是则跳过
-            let metadataKeywords = ["作词", "作曲", "编曲", "制作人", "演唱", "歌手"]
-            if metadataKeywords.contains(where: { text.contains($0) }) {
-                print("跳过元数据行: \(trimmedLine)")
-                continue
-            }
+            // // 检查是否是元数据行（如作词、作曲、编曲等），如果是则跳过
+            // let metadataKeywords = ["作词", "作曲", "编曲", "制作人", "演唱", "歌手"]
+            // if metadataKeywords.contains(where: { text.contains($0) }) {
+            //     print("跳过元数据行: \(trimmedLine)")
+            //     continue
+            // }
             
             // 如果文本为空，跳过这行
             if text.isEmpty {
-                print("跳过空歌词行")
+                // print("跳过空歌词行")
                 continue
             }
             
@@ -118,7 +118,7 @@ class LyricsParser {
                     let totalSeconds = minute * 60 + second + millisecond / (millisecond > 99 ? 1000 : 100)
                     
                     lyrics.append(LyricsLine(time: totalSeconds, text: text))
-                    print("添加歌词行: [\(String(format: "%.3f", totalSeconds))] \(text)")
+                    // print("添加歌词行: [\(String(format: "%.3f", totalSeconds))] \(text)")
                 }
             }
         }
@@ -131,7 +131,7 @@ class LyricsParser {
         if !lyrics.isEmpty {
             // 打印前3行歌词作为示例
             let sampleLines = lyrics.prefix(3).map { "[\($0.time)] \($0.text)" }
-            print("歌词示例:\n\(sampleLines.joined(separator: "\n"))")
+            // print("歌词示例:\n\(sampleLines.joined(separator: "\n"))")
         }
         
         return lyrics

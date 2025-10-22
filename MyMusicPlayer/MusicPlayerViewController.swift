@@ -222,13 +222,12 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             // 进度条（隐藏）
             progressView.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
             progressView.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressView.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 12), // 顶部12像素边距
+            progressView.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 20), // 顶部12像素边距
             
             // 进度滑块
             progressSlider.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressSlider.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 12), // 顶部12像素边距
-
+            progressSlider.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 20), // 顶部12像素边距
             
             // 时间标签
             timeLabel.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
@@ -243,20 +242,20 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomControls.widthAnchor, constant: -32), // 两侧各16像素边距
             
             // 按钮大小约束
-            previousButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
-            previousButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            previousButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            previousButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
             
-            playPauseButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.35),
-            playPauseButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.35),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
             
-            nextButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
-            nextButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            nextButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            nextButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
             
-            playModeButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
-            playModeButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
+            playModeButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            playModeButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
             
-            rangeLockButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28),
-            rangeLockButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.28)
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5)
         ])
         
         // 添加进度滑块事件
