@@ -94,6 +94,8 @@ class MusicScanner {
                                         let subdirectoryItem = DirectoryItem(name: itemURL.lastPathComponent, url: itemURL)
                                         subdirectoryItem.parentDirectory = parentItem
                                         parentItem.subdirectories.append(subdirectoryItem)
+                                        // 按目录名排序
+                                        parentItem.subdirectories.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
                                         scanWithProgress(itemURL, parentItem: subdirectoryItem)
                                     } else if self.isAudioFile(itemURL) {
                                         // 是音频文件，创建MusicItem并读取元数据
@@ -206,6 +208,8 @@ class MusicScanner {
                             let directoryItem = DirectoryItem(name: itemURL.lastPathComponent, url: itemURL)
                             directoryItem.parentDirectory = parentItem
                             parentItem.subdirectories.append(directoryItem)
+                            // 按目录名排序
+                            parentItem.subdirectories.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
                             // 递归扫描子目录，但不抛出错误，而是继续处理其他目录
                             scanSubdirectory(itemURL, parentItem: directoryItem)
                         } else if isAudioFile(itemURL) {

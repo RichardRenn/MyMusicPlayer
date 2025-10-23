@@ -28,6 +28,8 @@ class DirectoryItem {
     func addSubdirectory(_ directory: DirectoryItem) {
         directory.parentDirectory = self
         subdirectories.append(directory)
+        // 按目录名排序
+        subdirectories.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
     
     func addMusicFile(_ musicFile: MusicItem) {
