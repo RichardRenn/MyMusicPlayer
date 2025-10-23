@@ -406,19 +406,78 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             return
         }
         
-        // 显示加载提示
-        let alert = UIAlertController(title: "扫描中", message: "正在重新扫描所有文件夹...", preferredStyle: .alert)
-        present(alert, animated: true)
-        
         // 重新扫描所有根目录
-        var totalDirectories = rootDirectoryItems.count
+        let totalDirectories = rootDirectoryItems.count
         var completedScans = 0
         
+        // 用于跟踪每个目录的扫描进度
+        var directoryProgresses: [Int: Double] = [:]
+        // 初始化所有目录的进度为0
+        for index in 0..<totalDirectories {
+            directoryProgresses[index] = 0.0
+        }
+        
+        // 记录最后更新进度的目录索引
+        var lastUpdatedDirectoryIndex = 0
+        
+        // 创建并显示加载提示 - 只创建一次
+        let progressAlert = UIAlertController(
+            title: "扫描中", 
+            message: "正在扫描...", 
+            preferredStyle: .alert
+        )
+        
+        // 显示alert
+        present(progressAlert, animated: true)
+        
+        // 更新进度的函数
+        func updateProgress() {
+            DispatchQueue.main.async {
+                // 计算总进度（所有目录进度的平均值）
+                let totalProgress = directoryProgresses.values.reduce(0, +) / Double(totalDirectories)
+                let progressPercentage = Int(totalProgress * 100)
+                
+                // 获取最后更新的文件夹名称
+                let currentFolderName = self.rootDirectoryItems[lastUpdatedDirectoryIndex].name
+                
+                // 动态更新alert的消息内容，不重新创建alert
+                progressAlert.message = "正在扫描[\(currentFolderName)]\n进度: \(progressPercentage)%"
+            }
+        }
+        
         for (index, rootItem) in rootDirectoryItems.enumerated() {
-            guard let directoryURL = rootItem.url else { continue }
+            guard let directoryURL = rootItem.url else { 
+                // 如果URL为空，将其标记为完成
+                        completedScans += 1
+                        if completedScans == totalDirectories {
+                            DispatchQueue.main.async {
+                                // 关闭进度alert并更新数据
+                                progressAlert.dismiss(animated: true, completion: {
+                                    // 更新显示
+                                    self.updateDisplayItems()
+                                    
+                                    // 更新播放列表
+                                    var allMusicFiles: [MusicItem] = []
+                                    for rootItem in self.rootDirectoryItems {
+                                        allMusicFiles.append(contentsOf: self.scanner.getAllMusicFiles(from: rootItem))
+                                    }
+                                    self.musicPlayer.setPlaylist(allMusicFiles)
+                                })
+                            }
+                        }
+                continue 
+            }
             
-            scanner.scanDirectory(directoryURL, progressHandler: { _ in
-                // 进度更新可以在这里处理
+            scanner.scanDirectory(directoryURL, progressHandler: { [weak self] progress in
+                guard let self = self else { return }
+                
+                // 更新当前目录的进度
+                directoryProgresses[index] = progress
+                // 更新最后活动的目录索引
+                lastUpdatedDirectoryIndex = index
+                
+                // 更新进度显示
+                updateProgress()
             }, completionHandler: { [weak self] newRootItem in
                 guard let self = self else { return }
                 
@@ -433,23 +492,18 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     
                     // 如果所有扫描都完成了
                     if completedScans == totalDirectories {
-                        // 关闭加载提示
-                        alert.dismiss(animated: true)
-                        
-                        // 更新显示
-                        self.updateDisplayItems()
-                        
-                        // 更新播放列表 - 收集所有根目录的音乐文件
-                        var allMusicFiles: [MusicItem] = []
-                        for rootItem in self.rootDirectoryItems {
-                            allMusicFiles.append(contentsOf: self.scanner.getAllMusicFiles(from: rootItem))
-                        }
-                        self.musicPlayer.setPlaylist(allMusicFiles)
-                        
-                        // 显示成功提示
-                        let successAlert = UIAlertController(title: "成功", message: "所有文件夹已重新扫描", preferredStyle: .alert)
-                        successAlert.addAction(UIAlertAction(title: "确定", style: .default))
-                        self.present(successAlert, animated: true)
+                        // 关闭进度alert并更新数据
+                        progressAlert.dismiss(animated: true, completion: {
+                            // 更新显示
+                            self.updateDisplayItems()
+                            
+                            // 更新播放列表 - 收集所有根目录的音乐文件
+                            var allMusicFiles: [MusicItem] = []
+                            for rootItem in self.rootDirectoryItems {
+                                allMusicFiles.append(contentsOf: self.scanner.getAllMusicFiles(from: rootItem))
+                            }
+                            self.musicPlayer.setPlaylist(allMusicFiles)
+                        })
                     }
                 }
             })

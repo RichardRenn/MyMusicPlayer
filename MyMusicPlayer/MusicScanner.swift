@@ -21,10 +21,139 @@ class MusicScanner {
             let directoryName = url.lastPathComponent
             let directoryItem = DirectoryItem(name: directoryName, url: url)
             
+            // 先发送初始进度
+            DispatchQueue.main.async {
+                progressHandler(0.0)
+            }
+            
             // 只有在有权限的情况下才扫描
             if hasAccess {
-                // 调用不抛出错误的scanSubdirectory方法
-                self.scanSubdirectory(url, parentItem: directoryItem)
+                // 首先预扫描计算文件总数
+                var totalFilesCount = 0
+                var processedFilesCount = 0
+                
+                // 预扫描函数
+                func countFilesInDirectory(_ directoryURL: URL) -> Int {
+                    var count = 0
+                    
+                    do {
+                        var shouldStopItemAccess = false
+                        if directoryURL.startAccessingSecurityScopedResource() {
+                            shouldStopItemAccess = true
+                        }
+                        
+                        defer {
+                            if shouldStopItemAccess {
+                                directoryURL.stopAccessingSecurityScopedResource()
+                            }
+                        }
+                        
+                        let contents = try self.fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+                        
+                        for itemURL in contents {
+                            var isDir: ObjCBool = false
+                            if self.fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDir) {
+                                if isDir.boolValue {
+                                    count += countFilesInDirectory(itemURL)
+                                } else {
+                                    count += 1
+                                }
+                            }
+                        }
+                    } catch {
+                        print("预扫描目录失败: \(directoryURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                    }
+                    
+                    return count
+                }
+                
+                // 计算总文件数
+                totalFilesCount = countFilesInDirectory(url)
+                
+                // 实际扫描并更新进度
+                func scanWithProgress(_ url: URL, parentItem: DirectoryItem) {
+                    var shouldStopItemAccess = false
+                    if url.startAccessingSecurityScopedResource() {
+                        shouldStopItemAccess = true
+                    }
+                    
+                    do {
+                        let contents = try self.fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+                        
+                        for itemURL in contents {
+                            do {
+                                var itemShouldStopAccess = false
+                                if itemURL.startAccessingSecurityScopedResource() {
+                                    itemShouldStopAccess = true
+                                }
+                                
+                                var isDirectory: ObjCBool = false
+                                if self.fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDirectory) {
+                                    if isDirectory.boolValue {
+                                        // 是目录，创建DirectoryItem并递归扫描
+                                        let subdirectoryItem = DirectoryItem(name: itemURL.lastPathComponent, url: itemURL)
+                                        subdirectoryItem.parentDirectory = parentItem
+                                        parentItem.subdirectories.append(subdirectoryItem)
+                                        scanWithProgress(itemURL, parentItem: subdirectoryItem)
+                                    } else if self.isAudioFile(itemURL) {
+                                        // 是音频文件，创建MusicItem并读取元数据
+                                        let musicItem = MusicItem(url: itemURL)
+                                        musicItem.parentDirectory = parentItem
+                                        
+                                        // 读取音频文件元数据
+                                        self.readAudioMetadata(for: itemURL, into: musicItem)
+                                        
+                                        // 查找同名歌词文件
+                                        if let lyricsURL = self.findLyricsFile(for: itemURL) {
+                                            musicItem.lyricsURL = lyricsURL
+                                        }
+                                        
+                                        parentItem.musicFiles.append(musicItem)
+                                    }
+                                }
+                                
+                                // 释放项目的访问权限
+                                if itemShouldStopAccess {
+                                    itemURL.stopAccessingSecurityScopedResource()
+                                }
+                                
+                                // 更新处理的文件数和进度
+                                processedFilesCount += 1
+                                if totalFilesCount > 0 {
+                                    // 确保进度不会超过1.0 (100%)
+                                    let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
+                                    DispatchQueue.main.async {
+                                        progressHandler(progress)
+                                    }
+                                }
+                            } catch {
+                                // 跳过无法访问的文件或目录，但继续处理其他项目
+                                print("无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                                
+                                // 即使出错也计数，避免进度卡住
+                                processedFilesCount += 1
+                                if totalFilesCount > 0 {
+                                    // 确保进度不会超过1.0 (100%)
+                                    let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
+                                    DispatchQueue.main.async {
+                                        progressHandler(progress)
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        // 记录错误但不抛出，允许扫描继续处理已访问的部分
+                        print("扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
+                    }
+                    
+                    // 释放目录的访问权限
+                    if shouldStopItemAccess {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+                
+                // 执行带进度的扫描
+                scanWithProgress(url, parentItem: directoryItem)
             } else {
                 print("无法获取目录访问权限: \(url.lastPathComponent)")
             }
@@ -34,7 +163,7 @@ class MusicScanner {
                 url.stopAccessingSecurityScopedResource()
             }
             
-            // 即使有部分文件无法访问，也返回已扫描到的结果
+            // 确保最终进度为100%
             DispatchQueue.main.async {
                 progressHandler(1.0)
                 // 检查是否找到任何音乐文件或子目录，如果没有，则返回nil表示扫描无效
