@@ -1,4 +1,5 @@
 import UIKit
+import MediaPlayer
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -47,6 +48,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
+        print("📱 [SceneDelegate] Scene进入后台状态，准备更新Now Playing信息")
+        
+        // 确保在后台也能接收远程控制
+        // 更新一次Now Playing信息，确保在后台显示正确
+        MusicPlayer.shared.updateNowPlayingInfo()
+        print("📱 [SceneDelegate] 后台状态下已调用updateNowPlayingInfo方法")
     }
 
 }

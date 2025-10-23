@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import MediaPlayer
 
 // 基础类型定义
 struct LyricsLine {
@@ -101,10 +102,27 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     // 设置音频会话
     private func setupAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            // 简化音频会话配置，避免参数错误
+            try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
+            
+            // 允许应用接收远程控制事件
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+            print("🎵 [MusicPlayer] 音频会话设置成功，已启用远程控制接收")
         } catch {
-            print("设置音频会话失败: \(error)")
+            print("🎵 [MusicPlayer] 音频会话设置失败: \(error)")
+        }
+    }
+    
+    // 确保应用成为活动的媒体播放器
+    private func becomeActiveMediaPlayer() {
+        do {
+            // 简化参数，避免选项冲突
+            try AVAudioSession.sharedInstance().setActive(true)
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+            print("🎵 [MusicPlayer] 尝试让应用成为活动媒体播放器")
+        } catch {
+            print("🎵 [MusicPlayer] 无法激活音频会话: \(error)")
         }
     }
     
@@ -168,6 +186,15 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         }
         
         do {
+            // 停止当前播放
+            audioPlayer?.stop()
+            audioPlayer = nil
+            
+            // 简化音频会话配置，确保稳定性
+            try AVAudioSession.sharedInstance().setCategory(.playback)
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            // 创建新的音频播放器
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             audioPlayer?.prepareToPlay()
@@ -176,8 +203,18 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             isPlaying = true
             totalTime = audioPlayer?.duration ?? 0
             
+            // 确保应用成为活动的媒体播放器
+            becomeActiveMediaPlayer()
+            
             // 启动进度更新计时器
             startProgressTimer()
+            
+            // 立即更新Now Playing信息
+            DispatchQueue.main.async { [weak self] in
+                self?.updateNowPlayingInfo()
+                // 更新最后更新时间，避免短时间内重复更新
+                self?.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
+            }
         } catch {
             print("播放音乐失败: \(error)")
             isPlaying = false
@@ -206,9 +243,43 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         progressTimer = nil
     }
     
+    // 用于跟踪上一次更新Now Playing信息的时间
+    private var lastNowPlayingUpdateTime: TimeInterval = 0
+    
     // 更新播放进度
     @objc private func updateProgress() {
         currentTime = audioPlayer?.currentTime ?? 0
+        
+        // 降低Now Playing信息更新频率，每3秒更新一次
+        let currentTime = Date().timeIntervalSince1970
+        if currentTime - lastNowPlayingUpdateTime >= 3.0 {
+            updateNowPlayingInfo()
+            lastNowPlayingUpdateTime = currentTime
+        }
+    }
+    
+    // 更新控制中心显示信息
+    func updateNowPlayingInfo() {
+        // 先检查是否有正在播放的音乐
+        guard let currentMusic = currentMusic, let audioPlayer = audioPlayer else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            return
+        }
+        
+        // 创建基本的Now Playing信息字典（只包含必需字段）
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: currentMusic.title.isEmpty ? "未知标题" : currentMusic.title,
+            MPMediaItemPropertyArtist: currentMusic.artist.isEmpty ? "未知艺术家" : currentMusic.artist,
+            MPMediaItemPropertyPlaybackDuration: audioPlayer.duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: audioPlayer.currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0
+        ]
+        
+        // 直接设置Now Playing信息
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        
+        // 简化的诊断日志
+        print("🔊 [MusicPlayer] Now Playing信息已更新: 标题='\(info[MPMediaItemPropertyTitle]!)', 艺术家='\(info[MPMediaItemPropertyArtist]!)'")
     }
     
     // 清理安全范围资源的访问权限
@@ -233,13 +304,40 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         audioPlayer?.pause()
         isPlaying = false
         stopProgressTimer()
+        
+        // 在主线程上更新Now Playing信息和发送状态改变通知
+        DispatchQueue.main.async { [weak self] in
+            self?.updateNowPlayingInfo()
+            print("🎵 [MusicPlayer] 已暂停播放并更新Now Playing信息")
+            
+            // 发送播放器状态改变通知，确保UI组件能响应状态变化
+            NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        }
     }
     
     // 恢复播放
     func resume() {
+        // 确保音频会话处于活动状态
+        becomeActiveMediaPlayer()
+        
         audioPlayer?.play()
         isPlaying = true
         startProgressTimer()
+        
+        // 在主线程上更新Now Playing信息和发送状态改变通知
+        DispatchQueue.main.async { [weak self] in
+            self?.updateNowPlayingInfo()
+            
+            // 添加延迟再次更新，确保信息正确显示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self?.updateNowPlayingInfo()
+            }
+            
+            print("🎵 [MusicPlayer] 已恢复播放并更新Now Playing信息")
+            
+            // 发送播放器状态改变通知，确保UI组件能响应状态变化
+            NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        }
     }
     
     // 播放上一首
@@ -368,11 +466,29 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         currentTime = time
     }
     
+    // 停止播放
+    func stop() {
+        audioPlayer?.stop()
+        audioPlayer?.currentTime = 0
+        isPlaying = false
+        
+        stopProgressTimer()
+        
+        // 清空播放信息
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        
+        // 发送播放器状态改变通知
+        NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
+    }
+    
     // 清理资源
     deinit {
         stopProgressTimer()
         clearSecurityScopedResources()
         audioPlayer?.stop()
         audioPlayer = nil
+        
+        // 清空播放信息
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 }

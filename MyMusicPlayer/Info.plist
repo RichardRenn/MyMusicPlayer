@@ -26,6 +26,10 @@
 	<string>需要访问您的文件系统来扫描和播放音乐文件</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要访问您的文件系统来选择音乐文件夹</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
