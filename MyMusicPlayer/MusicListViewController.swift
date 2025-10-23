@@ -1161,20 +1161,35 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 // 关闭安全范围资源访问
                 directory.url?.stopAccessingSecurityScopedResource()
                 
-                // 从根目录列表中找到并移除对应项
-                var indexToRemove = -1
-                for i in 0..<rootDirectoryItems.count {
-                    if rootDirectoryItems[i].url?.path == directory.url?.path {
-                        indexToRemove = i
-                        break
+                var removed = false
+                
+                // 检查是否是根目录项
+                if directory.parentDirectory == nil {
+                    // 从根目录列表中找到并移除对应项
+                    if let indexToRemove = rootDirectoryItems.firstIndex(where: { $0.url?.path == directory.url?.path }) {
+                        rootDirectoryItems.remove(at: indexToRemove)
+                        removed = true
+                    }
+                } else {
+                    // 是子目录，从父目录的子目录列表中移除
+                    if let parent = directory.parentDirectory {
+                        if let indexToRemove = parent.subdirectories.firstIndex(where: { $0.url?.path == directory.url?.path }) {
+                            parent.subdirectories.remove(at: indexToRemove)
+                            removed = true
+                        }
                     }
                 }
                 
-                if indexToRemove >= 0 {
-                    rootDirectoryItems.remove(at: indexToRemove)
-                    
+                if removed {
                     // 使用安全的方式更新表格 - 直接调用updateDisplayItems刷新整个表格
                     updateDisplayItems()
+                    
+                    // 更新播放列表 - 收集所有根目录的音乐文件
+                    var allMusicFiles: [MusicItem] = []
+                    for rootItem in rootDirectoryItems {
+                        allMusicFiles.append(contentsOf: scanner.getAllMusicFiles(from: rootItem))
+                    }
+                    musicPlayer.setPlaylist(allMusicFiles)
                     
                     // 检查是否所有文件夹都被删除，如果是则返回选择文件夹页面
                     if rootDirectoryItems.isEmpty {
@@ -1183,6 +1198,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                         
                         // 延迟一点时间确保界面更新后再返回
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            // 获取根视图控制器并调用重置方法
+                            if let presentingVC = self.presentingViewController as? ViewController {
+                                presentingVC.resetSelectionState()
+                            }
                             // 关闭当前导航控制器，返回到选择文件夹页面
                             self.dismiss(animated: true, completion: nil)
                         }

@@ -5,6 +5,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     private let musicScanner = MusicScanner()
     private var selectedDirectoryURL: URL?
     private var securityScopedResources: [URL] = [] // 用于跟踪需要保持访问权限的资源
+    private var hasSelectedDirectory = false // 跟踪是否已选择过文件夹
     
     // UI元素
     private let titleLabel: UILabel = {
@@ -130,11 +131,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         }
         
         selectedDirectoryURL = url
+        hasSelectedDirectory = true // 标记已选择过文件夹
         
-        // 显示进度条
+        // 显示进度条并隐藏选择按钮
         progressView.isHidden = false
         progressLabel.isHidden = false
-        selectButton.isEnabled = false
+        selectButton.isHidden = true
         
         // 开始扫描文件夹
         musicScanner.scanDirectory(url, progressHandler: { [weak self] progress in
@@ -147,10 +149,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             guard let self = self else { return }
             
             DispatchQueue.main.async {
-                // 隐藏进度条
+                // 隐藏进度条（选择按钮保持隐藏状态）
                 self.progressView.isHidden = true
                 self.progressLabel.isHidden = true
-                self.selectButton.isEnabled = true
                 
                 // 扫描完成，更新UI
                 if let rootItem = rootDirectoryItem {
@@ -176,12 +177,28 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         clearSecurityScopedResources()
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 根据是否已选择过文件夹控制按钮可见性
+        selectButton.isHidden = hasSelectedDirectory
+    }
+    
     // 清理安全范围资源的访问权限
     private func clearSecurityScopedResources() {
         for url in securityScopedResources {
             url.stopAccessingSecurityScopedResource()
         }
         securityScopedResources.removeAll()
+    }
+    
+    // 重置文件夹选择状态（供其他控制器调用）
+    public func resetSelectionState() {
+        hasSelectedDirectory = false
+        clearSecurityScopedResources()
+        selectedDirectoryURL = nil
+        DispatchQueue.main.async {
+            self.selectButton.isHidden = false
+        }
     }
     
     // 通知处理方法已移除，因为MusicListViewController现在直接处理添加文件夹的逻辑
