@@ -729,7 +729,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let currentMusic = musicPlayer.currentMusic {
             bottomBanner.isHidden = false
             expandButton.isHidden = false // 有歌曲播放时显示展开按钮
-            songTitleLabel.text = currentMusic.title
+            // 显示艺术家名 - 歌曲名格式，如果有艺术家信息
+            if !currentMusic.artist.isEmpty && currentMusic.artist != "Unknown Artist" {
+                songTitleLabel.text = "\(currentMusic.artist) - \(currentMusic.title)"
+            } else {
+                songTitleLabel.text = currentMusic.title
+            }
             totalTimeLabel.text = formatTime(musicPlayer.totalTime)
             
             // 更新播放/暂停按钮
