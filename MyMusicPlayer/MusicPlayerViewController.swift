@@ -179,7 +179,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         view.backgroundColor = .systemBackground
         
         // 设置导航栏左侧返回按钮
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(closeButtonTapped))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "chevron.backward"), style: .plain, target: self, action: #selector(backButtonTapped))
         
         // 添加歌词显示表格
         view.addSubview(tableView)
@@ -445,8 +445,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     }
     
     // 按钮点击事件处理
-    @objc private func closeButtonTapped() {
-        // 使用popViewController返回上一个页面，而不是dismiss
+    @objc private func backButtonTapped() {
+        // 使用popViewController返回上一个页面
         navigationController?.popViewController(animated: true)
     }
     

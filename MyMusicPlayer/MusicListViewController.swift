@@ -635,6 +635,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             if isLyricsExpanded {
                 loadLyrics()
             }
+            
+            // 刷新表格视图，使当前播放的歌曲高亮显示
+            tableView.reloadData()
         } else {
             bottomBanner.isHidden = true
             expandButton.isHidden = true // 没有歌曲播放时隐藏展开按钮
