@@ -406,6 +406,28 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             return
         }
         
+        // 添加二次确认弹框
+        let confirmAlert = UIAlertController(
+            title: "确认刷新", 
+            message: "确定要重新扫描所有文件夹吗？", 
+            preferredStyle: .alert
+        )
+        
+        // 取消按钮
+        confirmAlert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // 确定按钮 - 用户确认后执行扫描
+        confirmAlert.addAction(UIAlertAction(title: "确定", style: .default) { [weak self] _ in
+            guard let self = self else { return }
+            self.performRefresh()
+        })
+        
+        // 显示确认弹框
+        present(confirmAlert, animated: true)
+    }
+    
+    // 执行刷新扫描的方法
+    private func performRefresh() {
         // 重新扫描所有根目录
         let totalDirectories = rootDirectoryItems.count
         var completedScans = 0
