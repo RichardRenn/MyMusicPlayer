@@ -472,6 +472,10 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         audioPlayer?.currentTime = 0
         isPlaying = false
         
+        // 清除当前播放音乐，使播放横幅完全消失
+        currentMusic = nil
+        currentIndex = -1
+        
         stopProgressTimer()
         
         // 清空播放信息

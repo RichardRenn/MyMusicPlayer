@@ -174,6 +174,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
         setupUI()
         updateDisplayItems()
     }
@@ -1061,4 +1062,84 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     }
     
     // 在updateProgress方法中调用updateCurrentLyricIndex来更新歌词显示
+    
+    // MARK: - 左滑删除功能实现
+    
+    // 允许编辑表格行
+    func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        return tableView != lyricsTableView
+    }
+    
+    // 设置编辑样式
+    func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+        if tableView == lyricsTableView {
+            return .none
+        }
+        
+        // 对于文件夹项允许删除
+        if displayItems[indexPath.row] is (DirectoryItem, Int) {
+            return .delete
+        } else {
+            return .none
+        }
+    }
+    
+    // 执行删除操作
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete && tableView != lyricsTableView {
+            if let directoryItem = displayItems[indexPath.row] as? (DirectoryItem, Int) {
+                let directory = directoryItem.0
+                
+                // 检查当前播放的歌曲是否在要删除的文件夹中
+                if let currentMusic = musicPlayer.currentMusic {
+                    // 递归检查歌曲的父目录链是否包含要删除的目录
+                    var currentParent = currentMusic.parentDirectory
+                    while let parent = currentParent {
+                        if parent.url?.path == directory.url?.path {
+                            // 当前播放的歌曲在要删除的文件夹中，停止播放
+                            musicPlayer.stop()
+                            break
+                        }
+                        currentParent = parent.parentDirectory
+                    }
+                }
+                
+                // 关闭安全范围资源访问
+                directory.url?.stopAccessingSecurityScopedResource()
+                
+                // 从根目录列表中找到并移除对应项
+                var indexToRemove = -1
+                for i in 0..<rootDirectoryItems.count {
+                    if rootDirectoryItems[i].url?.path == directory.url?.path {
+                        indexToRemove = i
+                        break
+                    }
+                }
+                
+                if indexToRemove >= 0 {
+                    rootDirectoryItems.remove(at: indexToRemove)
+                    
+                    // 使用安全的方式更新表格 - 直接调用updateDisplayItems刷新整个表格
+                    updateDisplayItems()
+                    
+                    // 检查是否所有文件夹都被删除，如果是则返回选择文件夹页面
+                    if rootDirectoryItems.isEmpty {
+                        // 停止播放
+                        musicPlayer.stop()
+                        
+                        // 延迟一点时间确保界面更新后再返回
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            // 关闭当前导航控制器，返回到选择文件夹页面
+                            self.dismiss(animated: true, completion: nil)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // 自定义删除按钮标题
+    func tableView(_ tableView: UITableView, titleForDeleteConfirmationButtonForRowAt indexPath: IndexPath) -> String? {
+        return "删除"
+    }
 }
