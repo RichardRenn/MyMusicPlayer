@@ -279,7 +279,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         
         // 简化的诊断日志
-        print("🔊 [MusicPlayer] Now Playing信息已更新: 标题='\(info[MPMediaItemPropertyTitle]!)', 艺术家='\(info[MPMediaItemPropertyArtist]!)'")
+//        print("🔊 [MusicPlayer] Now Playing信息已更新: 标题='\(info[MPMediaItemPropertyTitle]!)', 艺术家='\(info[MPMediaItemPropertyArtist]!)'")
     }
     
     // 清理安全范围资源的访问权限

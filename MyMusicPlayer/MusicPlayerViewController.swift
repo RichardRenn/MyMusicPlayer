@@ -17,6 +17,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     private var currentLyricIndex: Int = 0
     
     // UI元素
+    
     private let tableView: UITableView = {
         let tableView = UITableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -27,7 +28,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         return tableView
     }()
     
-    private let bottomControls: UIView = {
+    private let bottomBanner: UIView = {
         let view = UIView()
         view.backgroundColor = .secondarySystemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -43,11 +44,14 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.maximumTrackTintColor = .systemGray3
         slider.thumbTintColor = .systemBlue
         
-        // 自定义滑块外观为小方块
+        // 自定义滑块外观为圆角矩形
         let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
-            UIColor.systemBlue.setFill()
+            let ctx = context.cgContext
+            ctx.setFillColor(UIColor.systemBlue.cgColor)
             let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
-            context.fill(rect)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
         }
         slider.setThumbImage(thumbImage, for: .normal)
         slider.setThumbImage(thumbImage, for: .highlighted)
@@ -136,6 +140,24 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         setupPlayerObservers()
         startUpdateTimer()
         updateUI()
+        
+        // 添加左滑手势支持返回功能
+        setupSwipeGesture()
+    }
+    
+    // 设置左滑手势
+    private func setupSwipeGesture() {
+        let swipeGesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleSwipeGesture(_:)))
+        swipeGesture.edges = .left
+        view.addGestureRecognizer(swipeGesture)
+    }
+    
+    // 处理左滑手势
+    @objc private func handleSwipeGesture(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        if gesture.state == .recognized || gesture.state == .ended {
+            // 执行与返回按钮相同的操作
+            backButtonTapped()
+        }
     }
     
     deinit {
@@ -188,22 +210,22 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 注册表格单元格
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "lyricCell")
         
-        // 添加底部控制栏
-        view.addSubview(bottomControls)
-        bottomControls.addSubview(progressView) // 保留但隐藏
-        bottomControls.addSubview(progressSlider) // 添加滑块
-        bottomControls.addSubview(timeLabel)
-        bottomControls.addSubview(totalTimeLabel)
+        // 添加底部横幅
+        view.addSubview(bottomBanner)
+        bottomBanner.addSubview(progressView) // 保留但隐藏
+        bottomBanner.addSubview(progressSlider) // 添加滑块
+        bottomBanner.addSubview(timeLabel)
+        bottomBanner.addSubview(totalTimeLabel)
         
         // 创建合并的按钮容器StackView，实现居中显示
-        let allButtonsStack = UIStackView(arrangedSubviews: [previousButton, playPauseButton, nextButton, playModeButton, rangeLockButton])
+        let allButtonsStack = UIStackView(arrangedSubviews: [playModeButton, previousButton, playPauseButton, nextButton, rangeLockButton])
         allButtonsStack.translatesAutoresizingMaskIntoConstraints = false
         allButtonsStack.axis = .horizontal
         allButtonsStack.alignment = .center
         allButtonsStack.distribution = .equalSpacing
         allButtonsStack.spacing = 20
         
-        bottomControls.addSubview(allButtonsStack)
+        bottomBanner.addSubview(allButtonsStack)
         
         // 设置约束
         NSLayoutConstraint.activate([
@@ -211,51 +233,51 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: bottomControls.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor),
             
-            // 底部控制栏
-            bottomControls.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomControls.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomControls.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomControls.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 改为屏幕高度的15%
-            
-            // 进度条（隐藏）
-            progressView.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
-            progressView.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressView.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 20), // 顶部12像素边距
-            
-            // 进度滑块
-            progressSlider.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
-            progressSlider.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressSlider.topAnchor.constraint(equalTo: bottomControls.topAnchor, constant: 20), // 顶部12像素边距
-            
-            // 时间标签
-            timeLabel.leadingAnchor.constraint(equalTo: bottomControls.leadingAnchor, constant: 16), // 左侧16像素边距
-            timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 进度滑块下方4像素
-            
-            totalTimeLabel.trailingAnchor.constraint(equalTo: bottomControls.trailingAnchor, constant: -16), // 右侧16像素边距
-            totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 进度滑块下方4像素
+            // 底部横幅
+            bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 屏幕高度的15%
             
             // 合并的按钮组 - 居中显示
-            allButtonsStack.centerXAnchor.constraint(equalTo: bottomControls.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomControls.bottomAnchor, constant: -8), // 底部8像素边距
-            allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomControls.widthAnchor, constant: -32), // 两侧各16像素边距
+            allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -2), // 固定2像素底部边距
+            
+            // 进度条（隐藏）- 相对于按钮组上方定位
+            progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
+            progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
+            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
+            
+            // 进度滑块 - 相对于按钮组上方定位
+            progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
+            progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
+            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
+            
+            // 时间标签 - 相对于进度滑块下方定位
+            timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
+            timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
+            
+            totalTimeLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
+            totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
+            allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
             // 按钮大小约束
-            previousButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
-            previousButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
             
-            playPauseButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
-            playPauseButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
             
-            nextButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
-            nextButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
             
-            playModeButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
-            playModeButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
+            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
             
-            rangeLockButton.widthAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5),
-            rangeLockButton.heightAnchor.constraint(equalTo: bottomControls.heightAnchor, multiplier: 0.5)
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5)
         ])
         
         // 添加进度滑块事件

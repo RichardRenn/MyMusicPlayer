@@ -22,7 +22,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         button.setImage(UIImage(systemName: "chevron.up"), for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.backgroundColor = .secondarySystemBackground
-        button.layer.cornerRadius = 8
+        
+        // 创建上窄下宽的梯形形状
+        let shapeLayer = CAShapeLayer()
+        button.layer.mask = shapeLayer
+        
         return button
     }()
     
@@ -112,11 +116,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         slider.maximumTrackTintColor = .systemGray3
         slider.thumbTintColor = .systemBlue
         
-        // 自定义滑块外观为小方块
+        // 自定义滑块外观为圆角矩形
         let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
-            UIColor.systemBlue.setFill()
+            let ctx = context.cgContext
+            ctx.setFillColor(UIColor.systemBlue.cgColor)
             let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
-            context.fill(rect)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
         }
         slider.setThumbImage(thumbImage, for: .normal)
         slider.setThumbImage(thumbImage, for: .highlighted)
@@ -169,9 +176,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         super.viewDidLoad()
         setupUI()
         updateDisplayItems()
-        
-        // 设置导航栏
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "刷新", style: .plain, target: self, action: #selector(refreshButtonTapped))
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 当视图布局更新时重新设置梯形形状
+        updateButtonTrapezoidShape()
         
         // 注册通知
         NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: .musicPlayerPlaybackStateChanged, object: nil)
@@ -215,7 +225,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         bottomBanner.addSubview(totalTimeLabel)
         
         // 创建合并的按钮容器StackView，实现居中显示
-        let allButtonsStack = UIStackView(arrangedSubviews: [previousButton, playPauseButton, nextButton, playModeButton, rangeLockButton])
+        let allButtonsStack = UIStackView(arrangedSubviews: [playModeButton, previousButton, playPauseButton, nextButton, rangeLockButton])
         allButtonsStack.translatesAutoresizingMaskIntoConstraints = false
         allButtonsStack.axis = .horizontal
         allButtonsStack.alignment = .center
@@ -237,7 +247,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             
             // 展开/收起按钮
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            expandButton.widthAnchor.constraint(equalToConstant: 40),
+            expandButton.widthAnchor.constraint(equalToConstant: 80),
             expandButton.heightAnchor.constraint(equalToConstant: 20),
             expandButton.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor),
             
@@ -264,26 +274,26 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             songTitleLabel.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 12), // 固定12像素顶部边距
             
-            // 进度条（隐藏）
+            // 合并的按钮组 - 居中显示
+            allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -2), // 固定2像素底部边距
+            
+            // 进度条（隐藏）- 相对于按钮组上方定位
             progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressView.topAnchor.constraint(equalTo: songTitleLabel.bottomAnchor, constant: 8), // 固定8像素顶部边距
+            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
-            // 进度滑块和时间 - 第二部分
+            // 进度滑块 - 相对于按钮组上方定位
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressSlider.topAnchor.constraint(equalTo: songTitleLabel.bottomAnchor, constant: 8), // 固定8像素顶部边距
+            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
-            // 时间标签
+            // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
             
             totalTimeLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
             totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
-            
-            // 合并的按钮组 - 居中显示
-            allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -8), // 固定8像素底部边距
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
             // 按钮大小约束 - 使用底部横幅高度的百分比
@@ -313,6 +323,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 设置展开/收起按钮的点击事件
         expandButton.addTarget(self, action: #selector(toggleLyricsPanel), for: .touchUpInside)
+        
+        // 初始化梯形形状
+        updateButtonTrapezoidShape()
     }
     
     // 设置按钮点击事件
@@ -499,10 +512,47 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 显示或隐藏歌词面板
         lyricsPanel.isHidden = !isLyricsExpanded
         
+        // 更新梯形形状方向
+        updateButtonTrapezoidShape()
+        
         // 加载歌词
         if isLyricsExpanded {
             loadLyrics()
         }
+    }
+    
+    // 更新按钮的梯形形状
+    private func updateButtonTrapezoidShape() {
+        guard let maskLayer = expandButton.layer.mask as? CAShapeLayer else { return }
+        
+        let bounds = expandButton.bounds
+        let path = UIBezierPath()
+        
+        if isLyricsExpanded {
+            // 上宽下窄的梯形
+            let topWidth = bounds.width
+            let bottomWidth = bounds.width * 0.5
+            let offset = (topWidth - bottomWidth) / 2
+            
+            path.move(to: CGPoint(x: 0, y: 0))
+            path.addLine(to: CGPoint(x: topWidth, y: 0))
+            path.addLine(to: CGPoint(x: topWidth - offset, y: bounds.height))
+            path.addLine(to: CGPoint(x: offset, y: bounds.height))
+            path.close()
+        } else {
+            // 上窄下宽的梯形
+            let topWidth = bounds.width * 0.5
+            let bottomWidth = bounds.width
+            let offset = (bottomWidth - topWidth) / 2
+            
+            path.move(to: CGPoint(x: offset, y: 0))
+            path.addLine(to: CGPoint(x: bottomWidth - offset, y: 0))
+            path.addLine(to: CGPoint(x: bottomWidth, y: bounds.height))
+            path.addLine(to: CGPoint(x: 0, y: bounds.height))
+            path.close()
+        }
+        
+        maskLayer.path = path.cgPath
     }
     
     // 加载歌词
