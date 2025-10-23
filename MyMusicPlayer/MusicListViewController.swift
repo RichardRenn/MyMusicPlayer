@@ -926,7 +926,18 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 设置缩进
             cell.indentationLevel = level
             cell.indentationWidth = 20
-            cell.accessoryView = nil
+            
+            // 检查是否有歌词，如果有则显示歌词图标
+            if musicFile.lyricsURL != nil || !musicFile.lyrics.isEmpty {
+                let lyricIcon = UIImageView(image: UIImage(systemName: "music.note"))
+                lyricIcon.tintColor = .systemBlue
+                lyricIcon.contentMode = .scaleAspectFit
+                lyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
+                cell.accessoryView = lyricIcon
+            } else {
+                cell.accessoryView = nil
+            }
+            
             cell.accessoryType = .none
             
             cell.contentConfiguration = content
