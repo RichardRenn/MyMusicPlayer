@@ -93,12 +93,7 @@ MyMusicPlayer/
 │   ├── MusicPlayerViewController.swift   # 播放详情和歌词显示视图控制器
 │   ├── MusicPlayer.swift                 # 音乐播放器核心逻辑和状态管理
 │   ├── MusicScanner.swift                # 音乐文件和歌词扫描器
-│   ├── MusicItem.swift                   # 音乐文件数据模型
 │   ├── LyricsParser.swift                # LRC歌词解析器
-│   ├── CoreTypes.swift                   # 核心数据类型定义
-│   ├── CommonTypes.swift                 # 通用类型定义
-│   ├── SharedTypes.swift                 # 共享类型定义
-│   ├── Types.swift                       # 类型定义文件
 │   ├── Info.plist                        # 应用配置信息
 │   └── Base.lproj/
 │       ├── Main.storyboard               # 主界面故事板
