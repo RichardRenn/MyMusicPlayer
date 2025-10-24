@@ -14,6 +14,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     private var isLyricsExpanded = false
     private var lyrics: [LyricsLine] = []
     private var currentLyricIndex = 0
+    private var lyricsLoaded = false // 跟踪是否已经加载了歌词
+    private var currentPlayingMusicURL: URL? // 跟踪当前播放的歌曲URL
     
     // UI元素
     // 展开/收起歌词按钮
@@ -48,6 +50,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         tableView.separatorStyle = .none
         return tableView
     }()
+    
+
     
     private let tableView: UITableView = {
         let tableView = UITableView()
@@ -592,9 +596,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 更新梯形形状方向
         updateButtonTrapezoidShape()
         
-        // 加载歌词
+        // 加载歌词或保持当前位置
         if isLyricsExpanded {
-            loadLyrics()
+            if let currentMusic = musicPlayer.currentMusic {
+                // 只有在歌词未加载或歌曲改变时才重新加载歌词
+                if !lyricsLoaded || currentPlayingMusicURL != currentMusic.url {
+                    currentPlayingMusicURL = currentMusic.url
+                    loadLyrics()
+                } else {
+                    // 否则直接定位到当前播放位置
+                    updateLyricDisplay()
+                }
+            } else {
+                // 没有当前歌曲时加载默认歌词
+                loadLyrics()
+            }
         }
     }
     
@@ -638,6 +654,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 清空之前的歌词
         lyrics.removeAll()
         currentLyricIndex = 0
+        lyricsLoaded = false
         
         if let currentMusic = musicPlayer.currentMusic {
             // 先尝试使用已有的歌词缓存
@@ -708,20 +725,19 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         }
         
         // 刷新表格显示
-        print("准备刷新表格，当前歌词数量: \(lyrics.count)")
-        DispatchQueue.main.async {
-            print("在主线程执行表格刷新")
-            self.lyricsTableView.reloadData()
-            
-            // 初始滚动到第一行歌词
-            if !self.lyrics.isEmpty {
-                self.lyricsTableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .middle, animated: false)
+            print("准备刷新表格，当前歌词数量: \(lyrics.count)")
+            DispatchQueue.main.async {
+                print("在主线程执行表格刷新")
+                self.lyricsTableView.reloadData()
+                
+                // 加载完成后设置标志并更新显示位置
+                self.lyricsLoaded = true
+                self.updateLyricDisplay()
+                
+                print("表格刷新完成")
             }
             
-            print("表格刷新完成")
-        }
-        
-        print("===== 歌词加载结束 =====")
+            print("===== 歌词加载结束 =====")
     }
     
     // 更新播放器UI
@@ -763,9 +779,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 stopUpdateTimer()
             }
             
-            // 如果歌词面板是展开的，重新加载歌词
-            if isLyricsExpanded {
+            // 只有当歌曲发生变化时才重新加载歌词，避免暂停时重置歌词位置
+            if isLyricsExpanded && (currentPlayingMusicURL != currentMusic.url) {
+                currentPlayingMusicURL = currentMusic.url
                 loadLyrics()
+            } else if isLyricsExpanded {
+                // 当暂停播放时，保持当前歌词位置
+                updateLyricDisplay()
             }
             
             // 刷新表格视图，使当前播放的歌曲高亮显示
@@ -853,6 +873,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 发送通知，通知播放页更新滑块位置
         NotificationCenter.default.post(name: .musicPlayerProgressChanged, object: nil, userInfo: ["currentTime": seekTime, "totalTime": musicPlayer.totalTime])
+        
+        // 更新歌词显示，无论是否在播放状态
+        updateLyricDisplay()
         
         if musicPlayer.isPlaying {
             startUpdateTimer()
@@ -1122,7 +1145,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 处理歌词滚动，高亮当前播放的歌词
     private func updateCurrentLyricIndex() {
-        guard !lyrics.isEmpty, musicPlayer.isPlaying else { return }
+        guard !lyrics.isEmpty else { return }
         
         let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
         
@@ -1138,6 +1161,26 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     let indexPath = IndexPath(row: self.currentLyricIndex, section: 0)
                     self.lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
                 }
+            }
+        }
+    }
+    
+    // 参照MusicPlayerViewController实现歌词更新显示方法
+    private func updateLyricDisplay() {
+        if lyrics.isEmpty { return }
+        
+        let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
+        
+        if newIndex != currentLyricIndex {
+            currentLyricIndex = newIndex
+            
+            // 如果歌词面板是展开的，更新UI
+            if isLyricsExpanded {
+                lyricsTableView.reloadData()
+                
+                // 自动滚动到当前歌词
+                let indexPath = IndexPath(row: currentLyricIndex, section: 0)
+                lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
             }
         }
     }
