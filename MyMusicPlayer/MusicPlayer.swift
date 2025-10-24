@@ -2,17 +2,6 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 
-// 基础类型定义
-struct LyricsLine {
-    let time: TimeInterval
-    let text: String
-    
-    init(time: TimeInterval, text: String) {
-        self.time = time
-        self.text = text
-    }
-}
-
 class DirectoryItem: Equatable {
     let url: URL?
     let name: String

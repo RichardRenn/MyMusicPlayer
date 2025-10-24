@@ -33,7 +33,6 @@
 		22C5122C2A1B4C4400A1E52E /* MusicPlayerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayerViewController.swift; sourceTree = "<group>"; };
 		22C5122E2A1B4C4400A1E52E /* MusicScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicScanner.swift; sourceTree = "<group>"; };
 		22C512302A1B4C4400A1E52E /* MusicPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayer.swift; sourceTree = "<group>"; };
-		22C51232A1B4C4400A1E52E /* MusicItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicItem.swift; sourceTree = "<group>"; };
 		22C512342A1B4C4400A1E52E /* LyricsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsParser.swift; sourceTree = "<group>"; };
 		79359ADC2EAA89C6007BE053 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -70,7 +69,6 @@
 				22C5122C2A1B4C4400A1E52E /* MusicPlayerViewController.swift */,
 				22C5122E2A1B4C4400A1E52E /* MusicScanner.swift */,
 				22C512302A1B4C4400A1E52E /* MusicPlayer.swift */,
-				22C51232A1B4C4400A1E52E /* MusicItem.swift */,
 				22C512342A1B4C4400A1E52E /* LyricsParser.swift */,
 			);
 			path = MyMusicPlayer;

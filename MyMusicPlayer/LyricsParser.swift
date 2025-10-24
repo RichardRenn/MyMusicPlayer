@@ -1,5 +1,16 @@
 import Foundation
 
+// 临时定义，确保编译通过
+struct LyricsLine {
+    let time: TimeInterval
+    let text: String
+    
+    init(time: TimeInterval, text: String) {
+        self.time = time
+        self.text = text
+    }
+}
+
 class LyricsParser {
     
     // 解析LRC歌词文件
