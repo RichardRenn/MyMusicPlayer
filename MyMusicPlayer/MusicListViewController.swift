@@ -4,6 +4,37 @@ import AVFoundation
 // 导入Foundation以支持持久化功能
 import Foundation
 
+// 主题模式枚举
+enum ThemeMode: Int, Codable {
+    case light = 0    // 浅色模式
+    case dark = 1     // 深色模式
+    case system = 2   // 跟随系统
+    
+    // 切换到下一个主题模式
+    func next() -> ThemeMode {
+        switch self {
+        case .light:
+            return .dark
+        case .dark:
+            return .system
+        case .system:
+            return .light
+        }
+    }
+    
+    // 获取对应的图标名称
+    var iconName: String {
+        switch self {
+        case .light:
+            return "circle"      // 空心圆
+        case .dark:
+            return "moon.fill"        // 实心月亮
+        case .system:
+            return "circle.lefthalf.fill" // 半实心圆
+        }
+    }
+}
+
 class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate {
     
     private var rootDirectoryItems: [DirectoryItem] = [] // 修改为支持多个根目录
@@ -19,6 +50,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     private var currentLyricIndex = 0
     private var lyricsLoaded = false // 跟踪是否已经加载了歌词
     private var currentPlayingMusicURL: URL? // 跟踪当前播放的歌曲URL
+    
+    // 主题相关
+    private var currentThemeMode: ThemeMode = .system
+    private let themeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
     
     // UI元素
     // 展开/收起歌词按钮
@@ -273,11 +312,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         title = "音乐列表"
         view.backgroundColor = .systemBackground
         
+        // 加载保存的主题设置
+        loadThemeSetting()
+        applyTheme()
+        
         // 设置导航栏左侧加号按钮，用于添加新文件夹
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addFolderButtonTapped))
         
-        // 设置导航栏右侧刷新按钮
-        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .refresh, target: self, action: #selector(refreshButtonTapped))
+        // 设置导航栏右侧按钮（刷新按钮和主题切换按钮）
+        let refreshButton = UIBarButtonItem(barButtonSystemItem: .refresh, target: self, action: #selector(refreshButtonTapped))
+        themeButton.setImage(UIImage(systemName: currentThemeMode.iconName), for: .normal)
+        themeButton.addTarget(self, action: #selector(themeButtonTapped), for: .touchUpInside)
+        let themeBarButton = UIBarButtonItem(customView: themeButton)
+        
+        // 设置右侧按钮组
+        navigationItem.rightBarButtonItems = [refreshButton, themeBarButton]
         
         // 添加表格视图
         view.addSubview(tableView)
@@ -405,6 +454,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 初始化梯形形状
         updateButtonTrapezoidShape()
+        
+        // 设置主题变化通知
+        NotificationCenter.default.addObserver(self, selector: #selector(systemThemeChanged), name: Notification.Name(rawValue: "UIUserInterfaceStyleDidChangeNotification"), object: nil)
     }
     
     // 设置按钮点击事件
@@ -652,6 +704,62 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     @objc private func rangeLockButtonTapped() {
         musicPlayer.toggleRangeLock()
         updateRangeLockButtonImage()
+    }
+    
+    // 主题切换按钮点击事件
+    @objc private func themeButtonTapped() {
+        // 切换到下一个主题模式
+        currentThemeMode = currentThemeMode.next()
+        
+        // 更新按钮图标
+        themeButton.setImage(UIImage(systemName: currentThemeMode.iconName), for: .normal)
+        
+        // 应用新主题
+        applyTheme()
+        
+        // 保存主题设置
+        saveThemeSetting()
+    }
+    
+    // 应用主题
+    private func applyTheme() {
+        switch currentThemeMode {
+        case .light:
+            window?.overrideUserInterfaceStyle = .light
+        case .dark:
+            window?.overrideUserInterfaceStyle = .dark
+        case .system:
+            window?.overrideUserInterfaceStyle = .unspecified
+        }
+    }
+    
+    // 系统主题变化通知处理
+    @objc private func systemThemeChanged() {
+        // 只有在跟随系统模式下才需要响应系统主题变化
+        if currentThemeMode == .system {
+            applyTheme()
+        }
+    }
+    
+    // 保存主题设置
+    private func saveThemeSetting() {
+        UserDefaults.standard.set(currentThemeMode.rawValue, forKey: "themeMode")
+        UserDefaults.standard.synchronize()
+    }
+    
+    // 加载主题设置
+    private func loadThemeSetting() {
+        let savedValue = UserDefaults.standard.integer(forKey: "themeMode")
+        if let themeMode = ThemeMode(rawValue: savedValue) {
+            currentThemeMode = themeMode
+        } else {
+            currentThemeMode = .system
+        }
+    }
+    
+    // 获取应用窗口
+    private var window: UIWindow? {
+        return UIApplication.shared.windows.first
     }
     
     private var isSeeking = false // 标记是否正在手动拖动滑块
