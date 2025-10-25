@@ -724,7 +724,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 加载歌词
     private func loadLyrics() {
-        print("===== 开始加载歌词 =====")
+        print("[MusicListViewController] ===== 开始加载歌词 =====")
         // 清空之前的歌词
         lyrics.removeAll()
         currentLyricIndex = 0
@@ -733,28 +733,28 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let currentMusic = musicPlayer.currentMusic {
             // 先尝试使用已有的歌词缓存
             if !currentMusic.lyrics.isEmpty {
-                print("使用已缓存的歌词数据，共\(currentMusic.lyrics.count)行")
+                print("[MusicListViewController] 使用已缓存的歌词数据，共\(currentMusic.lyrics.count)行")
                 lyrics = currentMusic.lyrics
             } 
             // 尝试从文件加载歌词
             else if let lyricsURL = currentMusic.lyricsURL {
-                print("尝试从文件加载歌词: \(lyricsURL.lastPathComponent)")
-                print("歌词文件路径: \(lyricsURL.path)")
+                print("[MusicListViewController] 尝试从文件加载歌词: \(lyricsURL.lastPathComponent)")
+                print("[MusicListViewController] 歌词文件路径: \(lyricsURL.path)")
                 
                 // 检查文件是否存在
                 if FileManager.default.fileExists(atPath: lyricsURL.path) {
-                    print("歌词文件存在")
+                    print("[MusicListViewController] 歌词文件存在")
                 } else {
-                    print("歌词文件不存在于路径: \(lyricsURL.path)")
+                    print("[MusicListViewController] 歌词文件不存在于路径: \(lyricsURL.path)")
                 }
                 
                 // 为歌词加载添加访问权限处理
                 var shouldStopAccess = false
                 if lyricsURL.startAccessingSecurityScopedResource() {
                     shouldStopAccess = true
-                    print("成功获取歌词文件临时访问权限")
+                    print("[MusicListViewController] 成功获取歌词文件临时访问权限")
                 } else {
-                    print("未能获取歌词文件临时访问权限")
+                    print("[MusicListViewController] 未能获取歌词文件临时访问权限")
                 }
                 
                 // 尝试解析歌词
@@ -762,21 +762,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     if !parsedLyrics.isEmpty {
                         lyrics = parsedLyrics
                         currentMusic.lyrics = parsedLyrics // 缓存解析结果
-                        print("成功解析歌词，共\(lyrics.count)行")
+                        print("[MusicListViewController] 成功解析歌词，共\(lyrics.count)行")
                     } else {
-                        print("歌词文件存在但内容为空或格式错误")
+                        print("[MusicListViewController] 歌词文件存在但内容为空或格式错误")
                     }
                 } else {
-                    print("解析歌词文件失败")
+                    print("[MusicListViewController] 解析歌词文件失败")
                 }
                 
                 // 释放访问权限
                 if shouldStopAccess {
                     lyricsURL.stopAccessingSecurityScopedResource()
-                    print("已释放歌词文件访问权限")
+                    print("[MusicListViewController] 已释放歌词文件访问权限")
                 }
             } else {
-                print("音乐项没有关联的歌词URL")
+                print("[MusicListViewController] 音乐项没有关联的歌词URL")
             }
             
             // 如果没有歌词，添加默认文本
@@ -799,19 +799,19 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         }
         
         // 刷新表格显示
-            print("准备刷新表格，当前歌词数量: \(lyrics.count)")
+            print("[MusicListViewController] 准备刷新表格，当前歌词数量: \(lyrics.count)")
             DispatchQueue.main.async {
-                print("在主线程执行表格刷新")
+                print("[MusicListViewController] 在主线程执行表格刷新")
                 self.lyricsTableView.reloadData()
                 
                 // 加载完成后设置标志并更新显示位置
                 self.lyricsLoaded = true
                 self.updateLyricDisplay()
                 
-                print("表格刷新完成")
+                print("[MusicListViewController] 表格刷新完成")
             }
             
-            print("===== 歌词加载结束 =====")
+            print("[MusicListViewController] ===== 歌词加载结束 =====")
     }
     
     // 更新播放器UI
@@ -1014,10 +1014,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     if !isDuplicate {
                         // 添加到根目录列表
                         self.rootDirectoryItems.append(newRoot)
-                        print("成功添加新的根目录: \(newRoot.name)")
+                        print("[MusicListViewController] 成功添加新的根目录: \(newRoot.name)")
                         
                         // 更新UI显示
                         self.updateDisplayItems()
+                        
+                        // 立即持久化保存更新后的目录状态
+                        self.saveMusicList()
                         
                         // 显示成功提示
                         let successAlert = UIAlertController(title: "成功", message: "文件夹已添加到列表", preferredStyle: .alert)
@@ -1078,7 +1081,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         NotificationCenter.default.removeObserver(self)
         
         // 暂时禁用持久化功能
-         print("视图控制器销毁前，尝试保存音乐列表...")
+         print("[MusicListViewController] 视图控制器销毁前，尝试保存音乐列表...")
          saveMusicList()
     }
     

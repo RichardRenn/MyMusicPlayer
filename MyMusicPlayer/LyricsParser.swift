@@ -15,15 +15,15 @@ class LyricsParser {
     
     // 解析LRC歌词文件
     static func parseLyrics(from url: URL) -> [LyricsLine]? {
-        print("开始解析歌词文件: \(url.lastPathComponent)")
+        print("[LyricsParser] 开始解析歌词文件: \(url.lastPathComponent)")
         
         var shouldStopAccess = false
         let hasAccess = url.startAccessingSecurityScopedResource()
         if hasAccess {
             shouldStopAccess = true
-            print("成功获取歌词文件访问权限: \(url.lastPathComponent)")
+            print("[LyricsParser] 成功获取歌词文件访问权限: \(url.lastPathComponent)")
         } else {
-            print("无法获取歌词文件访问权限: \(url.lastPathComponent)，尝试使用备用方式访问")
+            print("[LyricsParser] 无法获取歌词文件访问权限: \(url.lastPathComponent)，尝试使用备用方式访问")
         }
         
         var result: [LyricsLine]?
@@ -31,7 +31,7 @@ class LyricsParser {
         defer {
             if shouldStopAccess {
                 url.stopAccessingSecurityScopedResource()
-                print("已释放歌词文件访问权限: \(url.lastPathComponent)")
+                print("[LyricsParser] 已释放歌词文件访问权限: \(url.lastPathComponent)")
             }
         }
         
@@ -42,10 +42,10 @@ class LyricsParser {
         for encoding in encodings {
             do {
                 content = try String(contentsOf: url, encoding: encoding)
-                print("使用编码 \(encoding) 成功读取歌词文件")
+                print("[LyricsParser] 使用编码 \(encoding) 成功读取歌词文件")
                 break // 成功读取后跳出循环
             } catch {
-                print("使用编码 \(encoding) 读取歌词文件失败: \(error.localizedDescription)")
+                print("[LyricsParser] 使用编码 \(encoding) 读取歌词文件失败: \(error.localizedDescription)")
                 continue
             }
         }
@@ -53,7 +53,7 @@ class LyricsParser {
         if let content = content {
             result = parseLyrics(content: content)
         } else {
-            print("尝试所有编码方式后仍无法读取歌词文件: \(url.lastPathComponent)")
+            print("[LyricsParser] 尝试所有编码方式后仍无法读取歌词文件: \(url.lastPathComponent)")
         }
         
         return result
@@ -68,7 +68,7 @@ class LyricsParser {
         
         // 按行分割歌词
         let lines = content.components(separatedBy: .newlines)
-        print("歌词文件共有 \(lines.count) 行")
+        print("[LyricsParser] 歌词文件共有 \(lines.count) 行")
         
         // 正则表达式匹配时间标签，支持两位数或三位数的毫秒部分
         let timeRegex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\]")
@@ -138,7 +138,7 @@ class LyricsParser {
         lyrics.sort { $0.time < $1.time }
         
         // 打印解析结果
-        print("歌词解析完成，共解析出 \(lyrics.count) 行歌词")
+        print("[LyricsParser] 歌词解析完成，共解析出 \(lyrics.count) 行歌词")
         if !lyrics.isEmpty {
             // 打印前3行歌词作为示例
             let sampleLines = lyrics.prefix(3).map { "[\($0.time)] \($0.text)" }

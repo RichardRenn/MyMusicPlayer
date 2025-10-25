@@ -171,7 +171,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         if url.startAccessingSecurityScopedResource() {
             shouldStopAccess = true
             securityScopedResources.append(url)
-            print("成功获取音频文件访问权限: \(url.lastPathComponent)")
+            print("🎵 [MusicPlayer] 成功获取音频文件访问权限: \(url.lastPathComponent)")
         }
         
         do {
@@ -205,7 +205,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
                 self?.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
             }
         } catch {
-            print("播放音乐失败: \(error)")
+            print("🎵 [MusicPlayer] 播放音乐失败: \(error)")
             isPlaying = false
             
             // 如果播放失败，释放访问权限
@@ -442,9 +442,9 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         if let err = error {
-            print("音频解码错误: \(err.localizedDescription)")
+            print("🎵 [MusicPlayer] 音频解码错误: \(err.localizedDescription)")
         } else {
-            print("音频解码错误: 未知错误")
+            print("🎵 [MusicPlayer] 音频解码错误: 未知错误")
         }
         isPlaying = false
     }

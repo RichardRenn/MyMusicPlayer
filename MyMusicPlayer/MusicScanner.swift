@@ -15,7 +15,7 @@ class MusicScanner {
             if url.startAccessingSecurityScopedResource() {
                 shouldStopAccess = true
                 hasAccess = true
-                print("成功获取目录访问权限: \(url.lastPathComponent)")
+                print("[MusicScanner] 成功获取目录访问权限: \(url.lastPathComponent)")
             }
             
             let directoryName = url.lastPathComponent
@@ -61,7 +61,7 @@ class MusicScanner {
                             }
                         }
                     } catch {
-                        print("预扫描目录失败: \(directoryURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                        print("[MusicScanner] 预扫描目录失败: \(directoryURL.lastPathComponent), 原因: \(error.localizedDescription)")
                     }
                     
                     return count
@@ -130,7 +130,7 @@ class MusicScanner {
                                 }
                             } catch {
                                 // 跳过无法访问的文件或目录，但继续处理其他项目
-                                print("无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                                print("[MusicScanner] 无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
                                 
                                 // 即使出错也计数，避免进度卡住
                                 processedFilesCount += 1
@@ -145,7 +145,7 @@ class MusicScanner {
                         }
                     } catch {
                         // 记录错误但不抛出，允许扫描继续处理已访问的部分
-                        print("扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
+                        print("[MusicScanner] 扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
                     }
                     
                     // 释放目录的访问权限
@@ -157,7 +157,7 @@ class MusicScanner {
                 // 执行带进度的扫描
                 scanWithProgress(url, parentItem: directoryItem)
             } else {
-                print("无法获取目录访问权限: \(url.lastPathComponent)")
+                print("[MusicScanner] 无法获取目录访问权限: \(url.lastPathComponent)")
             }
             
             // 释放安全范围资源的访问权限
@@ -170,7 +170,7 @@ class MusicScanner {
                 progressHandler(1.0)
                 // 检查是否找到任何音乐文件或子目录，如果没有，则返回nil表示扫描无效
                 if directoryItem.musicFiles.isEmpty && directoryItem.subdirectories.isEmpty {
-                    print("未在目录中找到任何音乐文件或子目录")
+                    print("[MusicScanner] 未在目录中找到任何音乐文件或子目录")
                     completionHandler(nil)
                 } else {
                     completionHandler(directoryItem)
@@ -187,7 +187,7 @@ class MusicScanner {
         // 如果URL是安全范围的资源，尝试请求访问权限
         if url.startAccessingSecurityScopedResource() {
             shouldStopAccess = true
-            print("成功获取子目录访问权限: \(url.lastPathComponent)")
+            print("[MusicScanner] 成功获取子目录访问权限: \(url.lastPathComponent)")
         }
         
         do {
@@ -223,7 +223,7 @@ class MusicScanner {
                             // 查找同名歌词文件
                             if let lyricsURL = findLyricsFile(for: itemURL) {
                                 musicItem.lyricsURL = lyricsURL
-                                print("找到歌词文件: \(lyricsURL.lastPathComponent)")
+                                print("[MusicScanner] 找到歌词文件: \(lyricsURL.lastPathComponent)")
                             }
                             
                             parentItem.musicFiles.append(musicItem)
@@ -236,12 +236,12 @@ class MusicScanner {
                     }
                 } catch {
                     // 跳过无法访问的文件或目录，但继续处理其他项目
-                    print("无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
+                    print("[MusicScanner] 无法访问项目: \(itemURL.lastPathComponent), 原因: \(error.localizedDescription)")
                 }
             }
         } catch {
             // 记录错误但不抛出，允许扫描继续处理已访问的部分
-            print("扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
+            print("[MusicScanner] 扫描子目录失败: \(url.lastPathComponent), 原因: \(error.localizedDescription)")
         }
         
         // 释放目录的访问权限
@@ -294,7 +294,7 @@ class MusicScanner {
             }
             
             if fileExists {
-                print("找到歌词文件: \(possibleURL.lastPathComponent)")
+                print("[MusicScanner] 找到歌词文件: \(possibleURL.lastPathComponent)")
                 return possibleURL
             }
         }
@@ -323,12 +323,12 @@ class MusicScanner {
                 
                 // 如果文件名（不包括扩展名）相同或包含歌曲名，认为是匹配的歌词文件
                 if fileBaseName == baseName || fileBaseName.contains(baseName) {
-                    print("通过模糊匹配找到歌词文件: \(fileURL.lastPathComponent) 对应歌曲: \(filenameWithoutExtension)")
+                    print("[MusicScanner] 通过模糊匹配找到歌词文件: \(fileURL.lastPathComponent) 对应歌曲: \(filenameWithoutExtension)")
                     return fileURL
                 }
             }
         } catch {
-            print("扫描目录查找歌词文件时出错: \(error.localizedDescription)")
+            print("[MusicScanner] 扫描目录查找歌词文件时出错: \(error.localizedDescription)")
         }
         
         return nil
@@ -382,7 +382,7 @@ class MusicScanner {
                     
                     metadataLoaded = true
                 } catch {
-                    print("读取音频元数据失败: \(error.localizedDescription)")
+                    print("[MusicScanner] 读取音频元数据失败: \(error.localizedDescription)")
                 }
             }
             
@@ -390,13 +390,13 @@ class MusicScanner {
             _ = semaphore.wait(timeout: .now() + 1)
             
             if metadataLoaded {
-                print("成功读取音频元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)', 专辑='\(musicItem.album)'")
+                print("[MusicScanner] 成功读取音频元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)', 专辑='\(musicItem.album)'")
             } else {
                 // 如果无法获取元数据，尝试从文件名解析标题和艺术家
                 parseTitleArtistFromFilename(url.lastPathComponent, into: musicItem)
             }
         } catch {
-            print("创建音频资产失败: \(error.localizedDescription)")
+            print("[MusicScanner] 创建音频资产失败: \(error.localizedDescription)")
             // 尝试从文件名解析
             parseTitleArtistFromFilename(url.lastPathComponent, into: musicItem)
         }
@@ -433,14 +433,14 @@ class MusicScanner {
                     musicItem.title = part1
                 }
                 
-                print("从文件名解析元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)'")
+                print("[MusicScanner] 从文件名解析元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)'")
                 return
             }
         }
         
         // 如果没有匹配任何格式，就使用整个文件名作为标题
         musicItem.title = nameWithoutExtension
-        print("使用默认文件名作为标题: '\(musicItem.title)'")
+        print("[MusicScanner] 使用默认文件名作为标题: '\(musicItem.title)'")
     }
     
     // 获取所有音乐文件（递归）
