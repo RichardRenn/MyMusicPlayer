@@ -1,6 +1,9 @@
 import UIKit
 import AVFoundation
 
+// 导入Foundation以支持持久化功能
+import Foundation
+
 class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate {
     
     private var rootDirectoryItems: [DirectoryItem] = [] // 修改为支持多个根目录
@@ -181,6 +184,77 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         setupUI()
         updateDisplayItems()
+        
+        // 启用应用生命周期通知
+        registerAppLifeCycleNotifications()
+    }
+    
+    // 注册应用生命周期通知
+    private func registerAppLifeCycleNotifications() {
+        // 应用进入后台通知
+        NotificationCenter.default.addObserver(self, selector: #selector(saveMusicListOnBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        
+        // 应用即将终止通知
+        NotificationCenter.default.addObserver(self, selector: #selector(saveMusicListOnTerminate), name: UIApplication.willTerminateNotification, object: nil)
+    }
+    
+    // 保存音乐列表
+    private func saveMusicList() {
+        // 简化的持久化功能，保存目录URL的书签数据
+        // 复制当前目录列表到局部变量，避免在异步操作中访问已释放的self
+        let currentRootDirectoryItems = self.rootDirectoryItems
+        
+        DispatchQueue.global().async {
+            let defaults = UserDefaults.standard
+            let key = "savedMusicDirectoriesBookmarks"
+            
+            // 检查是否有目录需要保存
+            if currentRootDirectoryItems.isEmpty {
+                // 没有目录时，从UserDefaults中删除数据键
+                defaults.removeObject(forKey: key)
+                print("[持久化] 所有目录已删除，清空保存的数据")
+                return
+            }
+            
+            // 创建书签数据数组
+            var bookmarksToSave = [Data]()
+            
+            // 遍历所有根目录项
+            for item in currentRootDirectoryItems {
+                if let directoryURL = item.url {
+                    do {
+                        // 创建书签 (iOS中不需要withSecurityScope选项)
+                        let bookmark = try directoryURL.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        bookmarksToSave.append(bookmark)
+                    } catch {
+                        // 捕获错误但继续执行
+                        continue
+                    }
+                }
+            }
+            
+            // 保存书签数据
+            do {
+                let data = try JSONEncoder().encode(bookmarksToSave)
+                defaults.set(data, forKey: key)
+                print("[持久化] 保存了\(bookmarksToSave.count)个目录书签数据")
+            } catch {
+                // 捕获编码错误
+                print("[持久化] 保存失败")
+            }
+        }
+    }
+    
+    // 应用进入后台时保存音乐列表
+    @objc private func saveMusicListOnBackground() {
+        print("📱 [MusicListVC] 应用进入后台，触发自动保存...")
+        saveMusicList()
+    }
+    
+    // 应用即将终止时保存音乐列表
+    @objc private func saveMusicListOnTerminate() {
+        print("📱 [MusicListVC] 应用即将终止，触发自动保存...")
+        saveMusicList()
     }
     
     override func viewDidLayoutSubviews() {
@@ -999,7 +1073,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     deinit {
         stopUpdateTimer()
         clearSecurityScopedResources()
+        
+        // 移除所有通知观察者
         NotificationCenter.default.removeObserver(self)
+        
+        // 暂时禁用持久化功能
+         print("视图控制器销毁前，尝试保存音乐列表...")
+         saveMusicList()
     }
     
     // UITableViewDataSource 方法
@@ -1261,10 +1341,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     }
                     musicPlayer.setPlaylist(allMusicFiles)
                     
+                    // 立即保存更新后的目录状态
+                    self.saveMusicList()
+                    
                     // 检查是否所有文件夹都被删除，如果是则返回选择文件夹页面
                     if rootDirectoryItems.isEmpty {
                         // 停止播放
                         musicPlayer.stop()
+                        
+                        // 立即保存空目录状态
+                        self.saveMusicList()
                         
                         // 延迟一点时间确保界面更新后再返回
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {

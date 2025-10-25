@@ -54,6 +54,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 更新一次Now Playing信息，确保在后台显示正确
         MusicPlayer.shared.updateNowPlayingInfo()
         print("📱 [SceneDelegate] 后台状态下已调用updateNowPlayingInfo方法")
+        
+        // 发送全局通知，通知所有监听者应用进入后台，以便保存数据
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        print("📱 [SceneDelegate] 已发送应用进入后台通知，触发数据保存操作")
     }
 
 }
