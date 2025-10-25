@@ -16,7 +16,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     // UI元素
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "欢迎使用音乐播放器"
+        label.text = "欢迎使用本地音乐播放器"
         label.font = UIFont.systemFont(ofSize: 24, weight: .bold)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -37,7 +37,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         let button = UIButton(type: .system)
         button.setTitle("选择文件夹", for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
-        button.backgroundColor = .systemBlue
+        button.backgroundColor = .tintColor
         button.setTitleColor(.white, for: .normal)
         button.layer.cornerRadius = 10
         button.clipsToBounds = true

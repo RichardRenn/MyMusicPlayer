@@ -40,14 +40,14 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.minimumTrackTintColor = .systemBlue
+        slider.minimumTrackTintColor = .tintColor
         slider.maximumTrackTintColor = .systemGray3
-        slider.thumbTintColor = .systemBlue
+        slider.thumbTintColor = .tintColor
         
         // 自定义滑块外观为圆角矩形
         let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
             let ctx = context.cgContext
-            ctx.setFillColor(UIColor.systemBlue.cgColor)
+            ctx.setFillColor(UIColor.tintColor.cgColor)
             let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
             let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
             ctx.addPath(path.cgPath)
@@ -545,7 +545,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 当前播放的歌词行高亮显示
         if indexPath.row == currentLyricIndex {
             content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
-            content.textProperties.color = .systemBlue
+            content.textProperties.color = .tintColor
         } else {
             content.textProperties.font = UIFont.systemFont(ofSize: 16)
             content.textProperties.color = .secondaryLabel
