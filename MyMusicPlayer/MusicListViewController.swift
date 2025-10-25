@@ -1305,6 +1305,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                         if parent.url?.path == directory.url?.path {
                             // 当前播放的歌曲在要删除的文件夹中，停止播放
                             musicPlayer.stop()
+                            
+                            // 收起歌词面板
+                            if isLyricsExpanded {
+                                toggleLyricsPanel()
+                            }
                             break
                         }
                         currentParent = parent.parentDirectory
