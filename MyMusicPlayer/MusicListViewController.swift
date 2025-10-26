@@ -26,7 +26,7 @@ enum ThemeMode: Int, Codable {
     var iconName: String {
         switch self {
         case .light:
-            return "circle"      // 空心圆
+            return "sun.max.fill"      // 实心太阳图标
         case .dark:
             return "moon.fill"        // 实心月亮
         case .system:
