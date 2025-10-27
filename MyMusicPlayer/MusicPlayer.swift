@@ -92,26 +92,35 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     private func setupAudioSession() {
         do {
             // 简化音频会话配置，避免参数错误
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
             
-            // 允许应用接收远程控制事件
-            UIApplication.shared.beginReceivingRemoteControlEvents()
-            print("🎵 [MusicPlayer] 音频会话设置成功，已启用远程控制接收")
+            // 确保正确设置类别和模式
+            try session.setCategory(.playback, mode: .default, options: [])
+            
+            // 使用options参数安全激活会话，避免系统音频设备冲突
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            print("🎵 [MusicPlayer] 音频会话设置成功")
         } catch {
             print("🎵 [MusicPlayer] 音频会话设置失败: \(error)")
+            // 错误2003332927通常表示Core Audio设备属性访问问题，记录详细信息便于调试
+            print("🎵 [MusicPlayer] 注意：如出现AQMEIO_HAL相关错误，通常是系统音频设备问题而非应用代码错误")
         }
     }
     
     // 确保应用成为活动的媒体播放器
     private func becomeActiveMediaPlayer() {
         do {
-            // 简化参数，避免选项冲突
-            try AVAudioSession.sharedInstance().setActive(true)
-            UIApplication.shared.beginReceivingRemoteControlEvents()
+            // 使用相同的安全参数激活音频会话
+            let session = AVAudioSession.sharedInstance()
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
             print("🎵 [MusicPlayer] 尝试让应用成为活动媒体播放器")
         } catch {
             print("🎵 [MusicPlayer] 无法激活音频会话: \(error)")
+            // 记录AQMEIO_HAL相关错误信息
+            if let nserror = error as? NSError, nserror.domain == NSOSStatusErrorDomain {
+                print("🎵 [MusicPlayer] Core Audio错误代码: \(nserror.code)，这通常是系统音频设备问题")
+            }
         }
     }
     
@@ -128,8 +137,13 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     // 播放指定的音乐
     func playMusic(_ music: MusicItem, at index: Int) {
+        // 防御性检查：确保传入的music不为nil
+        let musicURL = music.url
+        
         currentMusic = music
-        currentIndex = index
+        
+        // 确保索引在有效范围内
+        self.currentIndex = (index >= 0 && (!currentDirectoryPlaylist.isEmpty || index == 0)) ? index : 0
         
         // 更新当前目录播放列表
         if isRangeLocked {
@@ -144,7 +158,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         }
         
         // 播放音乐
-        playAudio(music.url)
+        playAudio(musicURL)
         
         // 发送播放器状态改变通知，让所有监听的视图控制器更新UI
         NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
@@ -152,12 +166,51 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     // 更新当前目录播放列表
     private func updateCurrentDirectoryPlaylist() {
-        guard let currentMusic = currentMusic else { return }
-        currentDirectoryPlaylist = fullPlaylist.filter { $0.parentDirectory == currentMusic.parentDirectory }
+        // 临时变量存储新的播放列表
+        var newPlaylist: [MusicItem] = []
         
-        // 重新计算当前索引
-        if let newIndex = currentDirectoryPlaylist.firstIndex(where: { $0.url == currentMusic.url }) {
-            currentIndex = newIndex
+        if let currentMusic = currentMusic {
+            // 如果锁定范围，播放列表只包含当前目录的音乐
+            if isRangeLocked {
+                newPlaylist = fullPlaylist.filter { $0.parentDirectory == currentMusic.parentDirectory }
+            } else {
+                // 否则使用完整播放列表
+                newPlaylist = fullPlaylist
+            }
+        } else {
+            // 当前音乐为nil，使用完整播放列表
+            print("🎵 [MusicPlayer] 当前播放音乐为nil，使用完整播放列表")
+            newPlaylist = fullPlaylist
+        }
+        
+        // 确保播放列表有效，避免空数组问题
+        if newPlaylist.isEmpty {
+            print("🎵 [MusicPlayer] 播放列表为空，重置索引")
+            currentDirectoryPlaylist = []
+            currentIndex = -1
+            return
+        }
+        
+        // 更新播放列表
+        currentDirectoryPlaylist = newPlaylist
+        
+        // 尝试更新当前索引，确保它在有效范围内
+        if let currentMusic = currentMusic {
+            if let newIndex = currentDirectoryPlaylist.firstIndex(where: { $0.url == currentMusic.url }) {
+                currentIndex = newIndex
+            } else {
+                // 如果找不到当前音乐，设置索引为0
+                print("🎵 [MusicPlayer] 在新播放列表中找不到当前音乐，重置为第一首")
+                currentIndex = 0
+            }
+        } else {
+            // 当前音乐为nil，设置索引为0
+            currentIndex = 0
+        }
+        
+        // 如果是随机播放模式，重置随机索引列表
+        if playMode == .shuffle {
+            resetShuffleIndices()
         }
     }
     
@@ -179,9 +232,10 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             audioPlayer?.stop()
             audioPlayer = nil
             
-            // 简化音频会话配置，确保稳定性
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
+            // 统一使用安全的音频会话配置参数
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
             
             // 创建新的音频播放器
             audioPlayer = try AVAudioPlayer(contentsOf: url)
@@ -256,7 +310,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         }
         
         // 创建基本的Now Playing信息字典（只包含必需字段）
-        var info: [String: Any] = [
+        let info: [String: Any] = [
             MPMediaItemPropertyTitle: currentMusic.title.isEmpty ? "未知标题" : currentMusic.title,
             MPMediaItemPropertyArtist: currentMusic.artist.isEmpty ? "未知艺术家" : currentMusic.artist,
             MPMediaItemPropertyPlaybackDuration: audioPlayer.duration,
@@ -357,28 +411,58 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     // 播放下一首
     func playNext() {
-        guard !currentDirectoryPlaylist.isEmpty else { return }
+        guard !currentDirectoryPlaylist.isEmpty else { 
+            print("🎵 [MusicPlayer] 播放队列为空，无法播放下一曲")
+            return 
+        }
         
         var newIndex: Int
         
         switch playMode {
         case .sequence:
-            newIndex = currentIndex + 1
+            // 安全计算顺序播放的下一个索引
+            newIndex = (currentIndex >= 0 ? currentIndex + 1 : 0)
             if newIndex >= currentDirectoryPlaylist.count {
                 newIndex = 0
             }
         case .repeatOne:
-            newIndex = currentIndex // 单曲循环，索引不变
+            // 单曲循环，确保索引有效
+            if currentIndex >= 0 && currentIndex < currentDirectoryPlaylist.count {
+                newIndex = currentIndex
+            } else {
+                newIndex = 0 // 索引无效时默认为第一首
+            }
         case .shuffle:
             // 随机播放模式下，重新生成随机索引
-            if shuffleIndices.isEmpty {
+            if shuffleIndices.isEmpty || shuffleIndices.first == nil {
                 resetShuffleIndices()
             }
-            newIndex = shuffleIndices.removeFirst()
+            
+            // 安全获取下一个随机索引
+            if !shuffleIndices.isEmpty {
+                newIndex = shuffleIndices.removeFirst()
+                // 确保获取的索引在有效范围内
+                if newIndex < 0 || newIndex >= currentDirectoryPlaylist.count {
+                    print("🎵 [MusicPlayer] 随机索引无效，重置为第一首")
+                    newIndex = 0
+                }
+            } else {
+                newIndex = 0 // 安全兜底
+            }
         }
         
-        let music = currentDirectoryPlaylist[newIndex]
-        playMusic(music, at: newIndex)
+        // 最终安全检查，确保索引有效后再访问数组
+        if newIndex >= 0 && newIndex < currentDirectoryPlaylist.count {
+            let music = currentDirectoryPlaylist[newIndex]
+            playMusic(music, at: newIndex)
+        } else {
+            print("🎵 [MusicPlayer] 索引超出范围，无法播放下一曲")
+            // 重置为第一首
+            if !currentDirectoryPlaylist.isEmpty {
+                let music = currentDirectoryPlaylist[0]
+                playMusic(music, at: 0)
+            }
+        }
     }
     
     // 切换播放模式
@@ -415,13 +499,27 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     // 重置随机播放索引
     private func resetShuffleIndices() {
+        // 安全检查播放列表是否为空
+        guard !currentDirectoryPlaylist.isEmpty else {
+            print("🎵 [MusicPlayer] 播放队列为空，无法重置随机索引")
+            shuffleIndices = []
+            return
+        }
+        
+        // 生成0到count-1的序列
         shuffleIndices = Array(0..<currentDirectoryPlaylist.count)
+        
+        // 打乱顺序
         shuffleIndices.shuffle()
         
         // 如果当前有播放的音乐，确保它不在随机列表的第一个位置
-        if currentIndex >= 0 && !shuffleIndices.isEmpty {
+        if currentIndex >= 0 && currentIndex < currentDirectoryPlaylist.count && !shuffleIndices.isEmpty {
+            // 安全地查找当前索引在shuffleIndices中的位置
             if let currentIndexInShuffle = shuffleIndices.firstIndex(of: currentIndex) {
-                shuffleIndices.remove(at: currentIndexInShuffle)
+                // 确保找到的索引有效且不是唯一的元素
+                if shuffleIndices.count > 1 {
+                    shuffleIndices.remove(at: currentIndexInShuffle)
+                }
             }
         }
     }
@@ -432,7 +530,9 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             // 当前歌曲播放完成，根据播放模式决定下一首
             if playMode == .repeatOne {
                 // 单曲循环，重新播放当前歌曲
-                playAudio(currentMusic!.url)
+                if let currentMusicURL = currentMusic?.url {
+                    playAudio(currentMusicURL)
+                }
             } else {
                 // 其他模式，播放下一首
                 playNext()

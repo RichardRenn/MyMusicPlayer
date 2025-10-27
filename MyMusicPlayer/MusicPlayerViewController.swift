@@ -415,7 +415,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
         
         if newIndex != currentLyricIndex {
-            currentLyricIndex = newIndex
+            // 确保索引在有效范围内
+            currentLyricIndex = min(max(newIndex, 0), lyrics.count - 1)
             
             // 滚动到当前歌词行，使其居中显示
             tableView.scrollToRow(at: IndexPath(row: currentLyricIndex, section: 0), at: .middle, animated: true)
