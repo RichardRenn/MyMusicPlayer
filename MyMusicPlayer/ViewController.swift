@@ -69,6 +69,27 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         // 添加按钮点击事件
         selectButton.addTarget(self, action: #selector(selectButtonTapped), for: .touchUpInside)
         checkForSavedMusicList() // 启用自动检查保存的音乐列表
+        
+        // 加载并应用保存的主题设置
+        loadSavedTheme()
+    }
+    
+    // 加载保存的主题设置
+    private func loadSavedTheme() {
+        let defaults = UserDefaults.standard
+        let themeKey = "themeMode"
+        
+        if let savedThemeValue = defaults.object(forKey: themeKey) as? Int {
+            switch savedThemeValue {
+            case 0: // light
+                self.overrideUserInterfaceStyle = .light
+            case 1: // dark
+                self.overrideUserInterfaceStyle = .dark
+            default: // system
+                self.overrideUserInterfaceStyle = .unspecified
+            }
+            print("[主题设置] 已加载保存的主题模式：\(savedThemeValue)")
+        }
     }
     
     // 检查是否有已保存的音乐列表

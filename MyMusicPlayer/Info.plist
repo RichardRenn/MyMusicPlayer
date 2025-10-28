@@ -70,5 +70,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- 支持深色模式设置 -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Automatic</string>
 </dict>
 </plist>
