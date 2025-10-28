@@ -26,11 +26,11 @@ enum ThemeMode: Int, Codable {
     var iconName: String {
         switch self {
         case .light:
-            return "sun.max.fill"      // 实心太阳图标
+            return "sun.min"      // 实心太阳图标
         case .dark:
-            return "moon.fill"        // 实心月亮
+            return "moon"        // 实心月亮
         case .system:
-            return "circle.lefthalf.fill" // 半实心圆
+            return "a.circle" // 半实心圆
         }
     }
 }
@@ -54,6 +54,18 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 主题相关
     private var currentThemeMode: ThemeMode = .system
     private let themeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    // 文件夹图标显示控制
+    private var showFolderIcons: Bool = true { 
+        didSet {
+            saveFolderIconSetting()
+        }
+    }
+    private let folderIconToggleButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -312,21 +324,29 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         title = "音乐列表"
         view.backgroundColor = .systemBackground
         
-        // 加载保存的主题设置
+        // 加载保存的设置
         loadThemeSetting()
+        loadFolderIconSetting()
         applyTheme()
         
-        // 设置导航栏左侧加号按钮，用于添加新文件夹
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addFolderButtonTapped))
+        // 设置导航栏左侧按钮（加号按钮和刷新按钮），受眼睛开关控制
+        updateLeftBarButtonsVisibility()
         
-        // 设置导航栏右侧按钮（刷新按钮和主题切换按钮）
-        let refreshButton = UIBarButtonItem(barButtonSystemItem: .refresh, target: self, action: #selector(refreshButtonTapped))
+        // 设置导航栏右侧按钮（眼睛图标按钮和主题切换按钮）
+        
+        // 设置眼睛图标按钮
+        folderIconToggleButton.setImage(UIImage(systemName: showFolderIcons ? "eye" : "eye.slash"), for: .normal)
+        folderIconToggleButton.addTarget(self, action: #selector(folderIconToggleButtonTapped), for: .touchUpInside)
+        let folderIconBarButton = UIBarButtonItem(customView: folderIconToggleButton)
+        
+        // 设置主题按钮
         themeButton.setImage(UIImage(systemName: currentThemeMode.iconName), for: .normal)
         themeButton.addTarget(self, action: #selector(themeButtonTapped), for: .touchUpInside)
         let themeBarButton = UIBarButtonItem(customView: themeButton)
         
         // 设置右侧按钮组
-        navigationItem.rightBarButtonItems = [refreshButton, themeBarButton]
+        // 眼睛图标按钮不受开关控制，始终显示
+        updateRightBarButtonsVisibility()
         
         // 添加表格视图
         view.addSubview(tableView)
@@ -704,6 +724,59 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     @objc private func rangeLockButtonTapped() {
         musicPlayer.toggleRangeLock()
         updateRangeLockButtonImage()
+    }
+    
+    // 切换文件夹图标显示状态的按钮点击事件
+    @objc private func folderIconToggleButtonTapped() {
+        // 切换显示状态
+        showFolderIcons.toggle()
+        
+        // 更新按钮图标
+        folderIconToggleButton.setImage(UIImage(systemName: showFolderIcons ? "eye" : "eye.slash"), for: .normal)
+        
+        // 刷新表格视图
+        tableView.reloadData()
+        
+        // 更新导航栏按钮可见性
+        updateLeftBarButtonsVisibility()
+        updateRightBarButtonsVisibility()
+    }
+    
+    // 保存文件夹图标设置
+    private func saveFolderIconSetting() {
+        UserDefaults.standard.set(showFolderIcons, forKey: "showFolderIcons")
+    }
+    
+    // 加载文件夹图标设置
+    private func loadFolderIconSetting() {
+        showFolderIcons = UserDefaults.standard.bool(forKey: "showFolderIcons")
+    }
+    
+    // 更新左侧导航栏按钮可见性
+    private func updateLeftBarButtonsVisibility() {
+        let addImage = UIImage(systemName: "plus.circle")
+        let addButton = UIBarButtonItem(image: addImage, style: .plain, target: self, action: #selector(addFolderButtonTapped))
+        
+        let refreshImage = UIImage(systemName: "arrow.trianglehead.clockwise")
+        let refreshButton = UIBarButtonItem(image: refreshImage, style: .plain, target: self, action: #selector(refreshButtonTapped))
+        
+        // 根据眼睛开关状态设置左侧按钮可见性
+        navigationItem.leftBarButtonItems = showFolderIcons ? [addButton, refreshButton] : nil
+    }
+    
+    // 更新右侧导航栏按钮可见性
+    private func updateRightBarButtonsVisibility() {
+        // 眼睛图标按钮不受开关控制，始终显示
+        let folderIconBarButton = UIBarButtonItem(customView: folderIconToggleButton)
+        
+        // 主题按钮受开关控制
+        if showFolderIcons {
+            let themeBarButton = UIBarButtonItem(customView: themeButton)
+            navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
+        } else {
+            // 只保留眼睛图标按钮
+            navigationItem.rightBarButtonItems = [folderIconBarButton]
+        }
     }
     
     // 主题切换按钮点击事件
@@ -1243,15 +1316,19 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             content.text = directory.name
             content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
             
-            // 在文件夹名称前添加图标前缀
-            let iconName = directory.isExpanded ? "folder.fill" : "folder"
-            content.image = UIImage(systemName: iconName)
-            content.imageProperties.tintColor = .tintColor
+            // 根据showFolderIcons控制是否显示文件夹图标
+            if showFolderIcons {
+                let iconName = directory.isExpanded ? "folder.fill" : "folder"
+                content.image = UIImage(systemName: iconName)
+                content.imageProperties.tintColor = .tintColor
+            } else {
+                content.image = nil // 不显示图标
+            }
             
             // 根据不同层级设置递增的缩进宽度
             // 基础缩进8像素，每层额外增加26像素
             cell.indentationLevel = 1 // 固定为1级
-            let baseIndent = 8
+            let baseIndent = 0
             let additionalIndent = 26
             cell.indentationWidth = CGFloat(baseIndent + additionalIndent * level) // 第1层8px，第2层34px，第3层60px等
             
@@ -1287,35 +1364,46 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             }
             
             
-            // 根据播放状态显示不同的音乐图标
-            if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url && musicPlayer.isPlaying {
-                content.image = UIImage(systemName: "play.fill") // 播放中的歌曲显示实心图标
+            // 根据showFolderIcons控制是否显示音乐图标
+            if showFolderIcons {
+                // 根据播放状态显示不同的音乐图标
+                if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url && musicPlayer.isPlaying {
+                    content.image = UIImage(systemName: "play.fill") // 播放中的歌曲显示实心图标
+                } else {
+                    content.image = UIImage(systemName: "play") // 非播放中的歌曲显示空心图标
+                }
+                // content.image = UIImage(systemName: "music.note")
+                content.imageProperties.tintColor = .tintColor
             } else {
-                content.image = UIImage(systemName: "play") // 非播放中的歌曲显示空心图标
+                content.image = nil // 不显示图标
             }
-            content.imageProperties.tintColor = .tintColor
 
             // 基础缩进8像素，每层额外增加26像素
             cell.indentationLevel = 1 // 固定为1级
-            let baseIndent = 8
+            let baseIndent = 0
             let additionalIndent = 26
             cell.indentationWidth = CGFloat(baseIndent + additionalIndent * level) // 与目录项保持一致的缩进规则
             
-            // 检查是否有歌词，根据歌词状态显示不同图标
+            // 根据showFolderIcons控制是否显示歌词图标
+            if showFolderIcons {
+                // 检查是否有歌词，根据歌词状态显示不同图标
                 if musicFile.lyricsURL != nil || !musicFile.lyrics.isEmpty {
-                    let lyricIcon = UIImageView(image: UIImage(systemName: "music.pages"))
+                    let lyricIcon = UIImageView(image: UIImage(systemName: "music.note"))
                     lyricIcon.tintColor = .tintColor
                     lyricIcon.contentMode = .scaleAspectFit
                     lyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
                     cell.accessoryView = lyricIcon
                 } else {
                     // 使用更通用的图标表示无歌词状态
-                    let noLyricIcon = UIImageView(image: UIImage(systemName: "minus.circle"))
+                    let noLyricIcon = UIImageView(image: UIImage(systemName: "music.note.slash"))
                     noLyricIcon.tintColor = .secondaryLabel
                     noLyricIcon.contentMode = .scaleAspectFit
                     noLyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
                     cell.accessoryView = noLyricIcon
                 }
+            } else {
+                cell.accessoryView = nil // 不显示任何图标
+            }
             
             cell.accessoryType = .none
             
