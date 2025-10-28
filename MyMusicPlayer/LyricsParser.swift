@@ -71,7 +71,7 @@ class LyricsParser {
         print("[LyricsParser] 歌词文件共有 \(lines.count) 行")
         
         // 正则表达式匹配时间标签，支持两位数或三位数的毫秒部分
-        let timeRegex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\]")
+        let timeRegex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d+)\\]")
         
         for line in lines {
             let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
