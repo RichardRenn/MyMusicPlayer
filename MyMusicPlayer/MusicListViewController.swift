@@ -927,9 +927,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let currentMusic = musicPlayer.currentMusic {
             bottomBanner.isHidden = false
             expandButton.isHidden = false // 有歌曲播放时显示展开按钮
-            // 显示艺术家名 - 歌曲名格式，如果有艺术家信息
+            // 显示歌曲名 - 艺术家名格式，如果有艺术家信息
             if !currentMusic.artist.isEmpty && currentMusic.artist != "Unknown Artist" {
-                songTitleLabel.text = "\(currentMusic.artist) - \(currentMusic.title)"
+                songTitleLabel.text = "\(currentMusic.title) - \(currentMusic.artist)"
             } else {
                 songTitleLabel.text = currentMusic.title
             }
@@ -1261,7 +1261,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         } else if let (musicFile, level) = item as? (MusicItem, Int) {
             // 音乐文件项
             var content = cell.defaultContentConfiguration()
-            content.text = musicFile.title
+            
+            // 显示格式：歌曲名 - 艺术家
+            if musicFile.artist != "Unknown Artist" {
+                content.text = "\(musicFile.title) - \(musicFile.artist)"
+            } else {
+                content.text = musicFile.title
+            }
             
             // 如果是当前播放的歌曲，高亮显示
                 if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {
