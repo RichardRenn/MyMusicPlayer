@@ -88,49 +88,49 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             default: // system
                 self.overrideUserInterfaceStyle = .unspecified
             }
-            print("[主题设置] 已加载保存的主题模式：\(savedThemeValue)")
+            print("[ViewController] [主题设置] 已加载保存的主题模式：\(savedThemeValue)")
         }
     }
     
     // 检查是否有已保存的音乐列表
     private func checkForSavedMusicList() {
-        print("[持久化] 开始检查保存的音乐列表...")
+        print("[ViewController] [持久化] 开始检查保存的音乐列表...")
         let defaults = UserDefaults.standard
         let bookmarkKey = "savedMusicDirectoriesBookmarks"
         
         // 检查UserDefaults中是否存在该键
         if defaults.object(forKey: bookmarkKey) != nil {
-            print("[持久化] UserDefaults中存在键 \(bookmarkKey)")
+            print("[ViewController] [持久化] UserDefaults中存在键 \(bookmarkKey)")
         } else {
-            print("[持久化] UserDefaults中不存在键 \(bookmarkKey)")
+            print("[ViewController] [持久化] UserDefaults中不存在键 \(bookmarkKey)")
             return
         }
         
         // 首先尝试从bookmark数据加载（新方法）
         if let savedBookmarksData = defaults.data(forKey: bookmarkKey) {
-            print("[持久化] 找到保存的安全书签数据，数据大小: \(savedBookmarksData.count)字节，尝试解析...")
+            print("[ViewController] [持久化] 找到保存的安全书签数据，数据大小: \(savedBookmarksData.count)字节，尝试解析...")
             do {
                 // 尝试解析保存的bookmark数据
                 let savedBookmarks = try JSONDecoder().decode([Data].self, from: savedBookmarksData)
-                print("[持久化] 解析成功，书签数量: \(savedBookmarks.count)")
+                print("[ViewController] [持久化] 解析成功，书签数量: \(savedBookmarks.count)")
                 
                 // 如果书签数组为空，直接返回，不尝试加载
                 if savedBookmarks.isEmpty {
-                    print("[持久化] 书签数组为空，无需恢复，显示选择文件夹界面")
+                    print("[ViewController] [持久化] 书签数组为空，无需恢复，显示选择文件夹界面")
                     return
                 }
                 
                 for (idx, bookmark) in savedBookmarks.enumerated() {
-                    print("[持久化] 加载的书签\(idx+1) - 数据类型: \(type(of: bookmark)), 大小: \(bookmark.count)字节")
+                    print("[ViewController] [持久化] 加载的书签\(idx+1) - 数据类型: \(type(of: bookmark)), 大小: \(bookmark.count)字节")
                     // 打印前几个字节的十六进制表示，用于验证数据一致性
                     let prefixSize = min(10, bookmark.count)
                     let prefixData = bookmark.subdata(in: 0..<prefixSize)
                     let hexDescription = prefixData.map { String(format: "%02x", $0) }.joined(separator: " ")
-                    print("[持久化] 加载的书签\(idx+1) - 前10字节: \(hexDescription)")
+                    print("[ViewController] [持久化] 加载的书签\(idx+1) - 前10字节: \(hexDescription)")
                 }
                 
                 if !savedBookmarks.isEmpty {
-                    print("[持久化] 发现保存的音乐目录书签，准备恢复访问权限...")
+                    print("[ViewController] [持久化] 发现保存的音乐目录书签，准备恢复访问权限...")
                     
                     // 创建一个数组来存储所有恢复的URL
                     var recoveredURLs: [URL] = []
@@ -147,9 +147,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                 .withoutUI
                             ]
                             
-                            print("[持久化] 尝试从书签\(index+1) 恢复URL...")
+                            print("[ViewController] [持久化] 尝试从书签\(index+1) 恢复URL...")
                             let recoveredURL = try URL(resolvingBookmarkData: bookmarkData, options: bookmarkOptions, relativeTo: nil, bookmarkDataIsStale: &isStale)
-                            print("[持久化] 成功从书签\(index+1) 恢复URL: \(recoveredURL.lastPathComponent)")
+                            print("[ViewController] [持久化] 成功从书签\(index+1) 恢复URL: \(recoveredURL.lastPathComponent)")
                             
                             // 检查是否是目录
                             var isDir: ObjCBool = false
@@ -158,7 +158,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                 if recoveredURL.startAccessingSecurityScopedResource() {
                                     self.securityScopedResources.append(recoveredURL)
                                     recoveredURLs.append(recoveredURL)
-                                    print("[持久化] 成功恢复文件夹\(index+1)访问权限")
+                                    print("[ViewController] [持久化] 成功恢复文件夹\(index+1)访问权限")
                                     
                                     // 如果书签已过时，重新创建它
                                     if isStale {
@@ -167,26 +167,26 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                             let updateOptions: URL.BookmarkCreationOptions = []
                                             let newBookmarkData = try recoveredURL.bookmarkData(options: updateOptions, includingResourceValuesForKeys: nil, relativeTo: nil)
                                             updatedBookmarks.append(newBookmarkData)
-                                            print("[持久化] 已更新过时的安全书签\(index+1)")
+                                            print("[ViewController] [持久化] 已更新过时的安全书签\(index+1)")
                                         } catch {
-                                            print("[持久化] 更新过时书签\(index+1)失败: \(error.localizedDescription)")
+                                            print("[ViewController] [持久化] 更新过时书签\(index+1)失败: \(error.localizedDescription)")
                                             updatedBookmarks.append(bookmarkData) // 保留原数据
                                         }
                                     } else {
                                         updatedBookmarks.append(bookmarkData)
                                     }
                                 } else {
-                                    print("[持久化] 无法获取文件夹\(index+1)的安全访问权限")
+                                    print("[ViewController] [持久化] 无法获取文件夹\(index+1)的安全访问权限")
                                     hasError = true
                                     updatedBookmarks.append(bookmarkData) // 保留原数据以便后续重试
                                 }
                             } else {
-                                print("[持久化] 恢复的URL不是有效的目录: \(recoveredURL.lastPathComponent)")
+                                print("[ViewController] [持久化] 恢复的URL不是有效的目录: \(recoveredURL.lastPathComponent)")
                                 hasError = true
                                 updatedBookmarks.append(bookmarkData)
                             }
                         } catch {
-                            print("[持久化] 从书签\(index+1)恢复URL失败: \(error.localizedDescription)")
+                            print("[ViewController] [持久化] 从书签\(index+1)恢复URL失败: \(error.localizedDescription)")
                             hasError = true
                             updatedBookmarks.append(bookmarkData) // 即使失败也保留原数据
                         }
@@ -198,7 +198,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                             let encodedData = try JSONEncoder().encode(updatedBookmarks)
                             UserDefaults.standard.set(encodedData, forKey: bookmarkKey)
                         } catch {
-                            print("[持久化] 保存更新的书签失败: \(error.localizedDescription)")
+                            print("[ViewController] [持久化] 保存更新的书签失败: \(error.localizedDescription)")
                         }
                     }
                     
@@ -221,7 +221,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                         // 逐个扫描每个URL
                         for (index, url) in recoveredURLs.enumerated() {
                             self.musicScanner.scanDirectory(url, progressHandler: { progress in
-                                print("[持久化] 扫描文件夹\(index+1)/\(totalScans) 进度: \(Int(progress * 100))%")
+                                print("[ViewController] [持久化] 扫描文件夹\(index+1)/\(totalScans) 进度: \(Int(progress * 100))%")
                                 
                                 // 更新进度条UI
                                 DispatchQueue.main.async {
@@ -237,16 +237,16 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                     // 如果成功扫描到目录，添加到结果数组
                                     if let rootItem = rootDirectoryItem {
                                         rootDirectoryItems.append(rootItem)
-                                        print("[持久化] 成功扫描文件夹\(index+1)/\(totalScans): \(rootItem.name)")
+                                        print("[ViewController] [持久化] 成功扫描文件夹\(index+1)/\(totalScans): \(rootItem.name)")
                                     } else {
-                                        print("[持久化] 扫描文件夹\(index+1)/\(totalScans)失败")
+                                        print("[ViewController] [持久化] 扫描文件夹\(index+1)/\(totalScans)失败")
                                     }
                                     
                                     // 检查是否所有扫描都已完成
                                     completedScans += 1
                                     if completedScans == totalScans {
                                         if !rootDirectoryItems.isEmpty {
-                                            print("[持久化] 所有文件夹扫描完成，成功扫描到\(rootDirectoryItems.count)个文件夹")
+                                            print("[ViewController] [持久化] 所有文件夹扫描完成，成功扫描到\(rootDirectoryItems.count)个文件夹")
                                             
                                             // 隐藏进度条
                                             self.progressView.isHidden = true
@@ -262,7 +262,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                             self.progressView.isHidden = true
                                             self.progressLabel.isHidden = true
                                             
-                                            print("[持久化] 所有文件夹都无法扫描到有效内容")
+                                            print("[ViewController] [持久化] 所有文件夹都无法扫描到有效内容")
                                             self.showPermissionErrorAndClearData()
                                         }
                                     }
@@ -272,7 +272,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                     }
                 }
             } catch {
-                print("[持久化] 解析书签数据失败: \(error.localizedDescription)")
+                print("[ViewController] [持久化] 解析书签数据失败: \(error.localizedDescription)")
                 self.tryLoadingFromLegacyFormat()
             }
         } else {
@@ -288,19 +288,19 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             
             // 添加取消按钮
             let cancelAction = UIAlertAction(title: "取消", style: .cancel) { _ in
-                print("[持久化] 用户取消了重新选择文件夹")
+                print("[ViewController] [持久化] 用户取消了重新选择文件夹")
             }
             
             // 添加重新选择按钮，点击后直接打开文件夹选择器
             let reselectAction = UIAlertAction(title: "重新选择", style: .default) { [weak self] _ in
                 guard let self = self else { return }
-                print("[持久化] 用户选择重新选择文件夹")
+                print("[ViewController] [持久化] 用户选择重新选择文件夹")
                 
                 // 清理所有保存的数据，包括新格式和旧格式
                 let defaults = UserDefaults.standard
                 defaults.removeObject(forKey: "savedMusicDirectoriesBookmarks")
                 defaults.removeObject(forKey: "savedMusicDirectories")
-                print("[持久化] 已清理所有过期的保存数据")
+                print("[ViewController] [持久化] 已清理所有过期的保存数据")
                 
                 // 打开文件夹选择器
                 self.selectButtonTapped()
@@ -309,33 +309,33 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             alert.addAction(cancelAction)
             alert.addAction(reselectAction)
             self.present(alert, animated: true) { 
-                print("[持久化] 权限过期提示已显示")
+                print("[ViewController] [持久化] 权限过期提示已显示")
             }
         }
     }
     
     // 尝试从旧的URL字符串格式加载（向后兼容）
     private func tryLoadingFromLegacyFormat() {
-        print("[持久化] 尝试从旧格式加载保存的音乐列表...")
+        print("[ViewController] [持久化] 尝试从旧格式加载保存的音乐列表...")
         let defaults = UserDefaults.standard
         let legacyKey = "savedMusicDirectories"
         
         if let savedDirectoriesData = defaults.data(forKey: legacyKey) {
-            print("[持久化] 找到旧格式保存的数据，尝试解析...")
+            print("[ViewController] [持久化] 找到旧格式保存的数据，尝试解析...")
             if let savedDirectories = try? JSONDecoder().decode([String].self, from: savedDirectoriesData) {
-                print("[持久化] 解析成功，目录数量: \(savedDirectories.count)")
+                print("[ViewController] [持久化] 解析成功，目录数量: \(savedDirectories.count)")
                 if !savedDirectories.isEmpty {
-                    print("[持久化] 发现保存的音乐目录，准备加载...")
+                    print("[ViewController] [持久化] 发现保存的音乐目录，准备加载...")
                     
                     // 获取保存的文件夹URL
                     if let firstURLString = savedDirectories.first, let savedURL = URL(string: firstURLString) {
-                        print("[持久化] 使用保存的路径: \(firstURLString)")
+                        print("[ViewController] [持久化] 使用保存的路径: \(firstURLString)")
                         
                         // 尝试获取文件夹访问权限
-                        print("[持久化] 尝试获取文件夹访问权限...")
+                        print("[ViewController] [持久化] 尝试获取文件夹访问权限...")
                         if savedURL.startAccessingSecurityScopedResource() {
                             self.securityScopedResources.append(savedURL)
-                            print("[持久化] 成功获取文件夹访问权限")
+                            print("[ViewController] [持久化] 成功获取文件夹访问权限")
                             
                             // 显示进度条并隐藏选择按钮
                             DispatchQueue.main.async {
@@ -346,7 +346,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                             
                             // 立即开始扫描
                             self.musicScanner.scanDirectory(savedURL, progressHandler: { progress in
-                                print("[持久化] 扫描进度: \(Int(progress * 100))%")
+                                print("[ViewController] [持久化] 扫描进度: \(Int(progress * 100))%")
                                 
                                 // 更新进度条UI
                                 DispatchQueue.main.async {
@@ -362,7 +362,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                     self.progressLabel.isHidden = true
                                     
                                     if let rootItem = rootDirectoryItem {
-                                        print("[持久化] 扫描完成，找到文件夹: \(rootItem.name)")
+                                        print("[ViewController] [持久化] 扫描完成，找到文件夹: \(rootItem.name)")
                                         
                                         // 跳转到音乐列表页面
                                         let musicListVC = MusicListViewController(rootDirectoryItem: rootItem, scanner: self.musicScanner)
@@ -373,18 +373,18 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                 }
                             }
                         } else {
-                            print("[持久化] 无法获取文件夹访问权限")
+                            print("[ViewController] [持久化] 无法获取文件夹访问权限")
                             self.showPermissionErrorAndClearData()
                         }
                     }
                 }
             } else {
-                print("[持久化] 解析数据失败")
+                print("[ViewController] [持久化] 解析数据失败")
             }
         } else {
-            print("[持久化] 未找到保存的音乐目录数据")
+            print("[ViewController] [持久化] 未找到保存的音乐目录数据")
         }
-        print("[持久化] 检查保存的音乐列表完成")
+        print("[ViewController] [持久化] 检查保存的音乐列表完成")
     }
     
     // 设置UI
@@ -453,9 +453,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             if url.startAccessingSecurityScopedResource() {
                 securityScopedResources.append(url)
                 grantedURLs.append(url)
-                print("[持久化] 成功获取文件夹访问权限: \(url.lastPathComponent)")
+                print("[ViewController] [持久化] 成功获取文件夹访问权限: \(url.lastPathComponent)")
             } else {
-                print("[持久化] 无法获取文件夹访问权限: \(url.lastPathComponent)")
+                print("[ViewController] [持久化] 无法获取文件夹访问权限: \(url.lastPathComponent)")
             }
         }
         
@@ -492,9 +492,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                     // 如果成功扫描到目录，添加到结果数组
                     if let rootItem = rootDirectoryItem {
                         rootDirectoryItems.append(rootItem)
-                        print("[选择器] 成功扫描文件夹\(index+1)/\(totalScans): \(rootItem.name)")
+                        print("[ViewController] [选择器] 成功扫描文件夹\(index+1)/\(totalScans): \(rootItem.name)")
                     } else {
-                        print("[选择器] 扫描文件夹\(index+1)/\(totalScans)失败")
+                        print("[ViewController] [选择器] 扫描文件夹\(index+1)/\(totalScans)失败")
                     }
                     
                     // 检查是否所有扫描都已完成
@@ -512,10 +512,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                 
                                 // 创建安全范围的书签数组
                                 var bookmarksToSave: [Data] = []
-                                print("[持久化] 开始为\(grantedURLs.count)个目录创建书签...")
+                                print("[ViewController] [持久化] 开始为\(grantedURLs.count)个目录创建书签...")
                                 
                                 for (index, url) in grantedURLs.enumerated() {
-                                    print("[持久化] 正在处理目录\(index+1): \(url.lastPathComponent) (URL: \(url.path))")
+                                    print("[ViewController] [持久化] 正在处理目录\(index+1): \(url.lastPathComponent) (URL: \(url.path))")
                                     
                                     // 在iOS中使用基本选项创建书签
                                     let bookmarkOptions: URL.BookmarkCreationOptions = []
@@ -524,9 +524,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                         // 验证URL是否可访问
                                         var isDir: ObjCBool = false
                                         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue {
-                                            print("[持久化] URL验证: 是有效的目录")
+                                            print("[ViewController] [持久化] URL验证: 是有效的目录")
                                         } else {
-                                            print("[持久化] URL验证: 不是有效目录或无法访问")
+                                            print("[ViewController] [持久化] URL验证: 不是有效目录或无法访问")
                                         }
                                         
                                         let bookmarkData = try url.bookmarkData(
