@@ -1243,9 +1243,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             content.text = directory.name
             content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
             
-            // 设置缩进
-            cell.indentationLevel = level
-            cell.indentationWidth = 20
+            // 在文件夹名称前添加图标前缀
+            let iconName = directory.isExpanded ? "folder.fill" : "folder"
+            content.image = UIImage(systemName: iconName)
+            content.imageProperties.tintColor = .tintColor
+            
+            // 根据不同层级设置递增的缩进宽度
+            // 基础缩进8像素，每层额外增加26像素
+            cell.indentationLevel = 1 // 固定为1级
+            let baseIndent = 8
+            let additionalIndent = 26
+            cell.indentationWidth = CGFloat(baseIndent + additionalIndent * level) // 第1层8px，第2层34px，第3层60px等
             
             // 设置附件视图（展开/折叠指示器）
             if !directory.subdirectories.isEmpty || !directory.musicFiles.isEmpty {
@@ -1278,20 +1286,36 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 content.textProperties.color = .label
             }
             
-            // 设置缩进
-            cell.indentationLevel = level
-            cell.indentationWidth = 20
             
-            // 检查是否有歌词，如果有则显示歌词图标
+            // 根据播放状态显示不同的音乐图标
+            if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url && musicPlayer.isPlaying {
+                content.image = UIImage(systemName: "play.fill") // 播放中的歌曲显示实心图标
+            } else {
+                content.image = UIImage(systemName: "play") // 非播放中的歌曲显示空心图标
+            }
+            content.imageProperties.tintColor = .tintColor
+
+            // 基础缩进8像素，每层额外增加26像素
+            cell.indentationLevel = 1 // 固定为1级
+            let baseIndent = 8
+            let additionalIndent = 26
+            cell.indentationWidth = CGFloat(baseIndent + additionalIndent * level) // 与目录项保持一致的缩进规则
+            
+            // 检查是否有歌词，根据歌词状态显示不同图标
                 if musicFile.lyricsURL != nil || !musicFile.lyrics.isEmpty {
-                    let lyricIcon = UIImageView(image: UIImage(systemName: "music.note"))
+                    let lyricIcon = UIImageView(image: UIImage(systemName: "music.pages"))
                     lyricIcon.tintColor = .tintColor
                     lyricIcon.contentMode = .scaleAspectFit
                     lyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
                     cell.accessoryView = lyricIcon
                 } else {
-                cell.accessoryView = nil
-            }
+                    // 使用更通用的图标表示无歌词状态
+                    let noLyricIcon = UIImageView(image: UIImage(systemName: "minus.circle"))
+                    noLyricIcon.tintColor = .secondaryLabel
+                    noLyricIcon.contentMode = .scaleAspectFit
+                    noLyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
+                    cell.accessoryView = noLyricIcon
+                }
             
             cell.accessoryType = .none
             
