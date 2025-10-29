@@ -65,8 +65,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     private let scanningTipsLabel: UILabel = {
         let label = UILabel()
-        label.text = "正在很努力的打开歌曲库 请稍等下下～"
-        label.font = UIFont.systemFont(ofSize: 13)
+        // label.text = "正在很努力的打开歌曲库 请稍等下下～"
+        label.text = ""
+        label.font = UIFont.systemFont(ofSize: 14)
         label.textColor = .secondaryLabel
         label.textAlignment = .center
         label.isHidden = true
@@ -76,7 +77,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     private let tipsLabel: UILabel = {
         let label = UILabel()
-        label.font = UIFont.systemFont(ofSize: 13)
+        label.font = UIFont.systemFont(ofSize: 14)
         label.textColor = .secondaryLabel
         label.textAlignment = .center
         label.numberOfLines = 0
@@ -89,10 +90,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     private let tipsArray = [
         "文件夹左滑可以删除哦～",
         "歌曲较多时会显示加载进度 请稍等下下～",
-        "锁定可以控制只在歌曲所在目录循环播放呢～",
-        "右上角眼睛图标可以让页面更清爽～",
+        "锁定可以控制只在歌曲所在目录循环播放～",
+        "右上眼镜图标可以让页面更清爽～",
         "轻点下方的歌曲名来快速定位到歌曲位置～",
-        "点一下播放横幅空白处可以进入歌词详情～"
+        "点击播放控制空白处可以进入歌词详情页～"
     ]
     
     // 当前提示索引
@@ -307,6 +308,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                             self.progressLabel.isHidden = false
                             self.scanningTipsLabel.isHidden = false
                             self.selectButton.isHidden = true
+                            // self.subtitleLabel.isHidden = true
                         }
                         
                         // 逐个扫描每个URL
@@ -434,6 +436,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                     self.progressLabel.isHidden = false
                                     self.scanningTipsLabel.isHidden = false
                                     self.selectButton.isHidden = true
+                                    // self.subtitleLabel.isHidden = true
                                 }
                             
                             // 立即开始扫描
@@ -527,8 +530,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             // 布局约束
             tipsLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             tipsLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            tipsLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            tipsLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 20) // 确保有足够高度显示文本
+            tipsLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -100),
+            tipsLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 30) // 确保有足够高度显示文本
         ])
     }
     
@@ -578,6 +581,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         progressLabel.isHidden = false
         scanningTipsLabel.isHidden = false
         selectButton.isHidden = true
+        // subtitleLabel.isHidden = true
         
         // 逐个扫描所有选中的URL并收集结果
         var rootDirectoryItems: [DirectoryItem] = []
@@ -698,9 +702,13 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                             navigationController.modalPresentationStyle = .fullScreen
                             self.present(navigationController, animated: true, completion: nil)
                         } else {
-                            // 扫描失败，显示错误提示
+                            // 扫描失败，显示错误提示并恢复选择按钮和副标题，隐藏扫描提示
                             let alert = UIAlertController(title: "扫描失败", message: "无法扫描所选文件夹，请重试", preferredStyle: .alert)
-                            alert.addAction(UIAlertAction(title: "确定", style: .default))
+                            alert.addAction(UIAlertAction(title: "确定", style: .default) { [weak self] _ in
+                                self?.selectButton.isHidden = false
+                                // self?.subtitleLabel.isHidden = false
+                                self?.scanningTipsLabel.isHidden = true
+                            })
                             self.present(alert, animated: true)
                         }
                     }
@@ -712,12 +720,18 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
         // 用户取消了选择
         clearSecurityScopedResources()
+        // 确保选择按钮可见，隐藏扫描提示
+        selectButton.isHidden = false
+        // subtitleLabel.isHidden = false
+        scanningTipsLabel.isHidden = true
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 根据是否已选择过文件夹控制按钮可见性
+        // 根据是否已选择过文件夹控制按钮和扫描提示的可见性
         selectButton.isHidden = hasSelectedDirectory
+        // subtitleLabel.isHidden = hasSelectedDirectory
+        scanningTipsLabel.isHidden = !hasSelectedDirectory
     }
     
     // 清理安全范围资源的访问权限
@@ -735,6 +749,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         selectedDirectoryURL = nil
         DispatchQueue.main.async {
             self.selectButton.isHidden = false
+            // self.subtitleLabel.isHidden = false
+            self.scanningTipsLabel.isHidden = true
         }
     }
     

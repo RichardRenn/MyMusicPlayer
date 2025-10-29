@@ -26,11 +26,11 @@ enum ThemeMode: Int, Codable {
     var iconName: String {
         switch self {
         case .light:
-            return "sun.min"      // 实心太阳图标
+            return "sun.min.fill"      // 太阳图标
         case .dark:
-            return "moon"        // 实心月亮
+            return "moon.stars.fill"   // 月亮
         case .system:
-            return "a.circle" // 半实心圆
+            return "a.circle"          // 跟随系统
         }
     }
 }
@@ -322,7 +322,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 设置UI
     private func setupUI() {
-        title = "音乐列表"
+        title = "音乐库"
         view.backgroundColor = .systemBackground
         
         // 加载保存的设置
@@ -330,10 +330,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         loadFolderIconSetting()
         applyTheme()
         
-        // 设置导航栏左侧按钮（加号按钮和刷新按钮），受眼睛开关控制
+        // 设置导航栏左侧按钮（加号按钮和刷新按钮），受眼镜开关控制
         updateLeftBarButtonsVisibility()
         
-        // 设置导航栏右侧按钮（眼睛图标按钮和主题切换按钮）
+        // 设置导航栏右侧按钮（眼镜图标按钮和主题切换按钮）
         
         // 初始化右侧导航栏按钮
         updateRightBarButtonsVisibility()
@@ -769,7 +769,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 刷新表格视图
         tableView.reloadData()
         
-        // 更新导航栏按钮可见性（包括更新眼睛图标）
+        // 更新导航栏按钮可见性（包括更新眼镜图标）
         updateLeftBarButtonsVisibility()
         updateRightBarButtonsVisibility()
     }
@@ -786,20 +786,22 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 更新左侧导航栏按钮可见性
     private func updateLeftBarButtonsVisibility() {
-        let addImage = UIImage(systemName: "plus.circle")
+        // 添加
+        let addImage = UIImage(systemName: "plus")
         let addButton = UIBarButtonItem(image: addImage, style: .plain, target: self, action: #selector(addFolderButtonTapped))
         
-        let refreshImage = UIImage(systemName: "arrow.trianglehead.clockwise")
+        // 刷新
+        let refreshImage = UIImage(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
         let refreshButton = UIBarButtonItem(image: refreshImage, style: .plain, target: self, action: #selector(refreshButtonTapped))
         
-        // 根据眼睛开关状态设置左侧按钮可见性
+        // 根据眼镜开关状态设置左侧按钮可见性
         navigationItem.leftBarButtonItems = showFolderIcons ? [addButton, refreshButton] : nil
     }
     
     // 更新右侧导航栏按钮可见性
     private func updateRightBarButtonsVisibility() {
-        // 直接使用UIBarButtonItem创建眼睛图标按钮
-        let folderIconImage = UIImage(systemName: showFolderIcons ? "eye" : "eye.slash")
+        // 直接使用UIBarButtonItem创建眼镜图标按钮
+        let folderIconImage = UIImage(systemName: showFolderIcons ? "eyeglasses" : "eyeglasses.slash")
         let folderIconBarButton = UIBarButtonItem(image: folderIconImage, style: .plain, target: self, action: #selector(folderIconToggleButtonTapped))
         folderIconBarButton.width = 32
         
@@ -810,7 +812,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             themeBarButton.width = 32
             navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
         } else {
-            // 只保留眼睛图标按钮
+            // 只保留眼镜图标按钮
             navigationItem.rightBarButtonItems = [folderIconBarButton]
         }
     }
@@ -1208,6 +1210,22 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 将权限记录添加到数组中以便稍后释放
         securityScopedResources.append(url)
         
+        // 先获取文件夹名称
+        let folderName = url.lastPathComponent
+        
+        // 先检查是否已存在同名同路径的文件夹
+        let isDuplicate = self.rootDirectoryItems.contains {
+            $0.name == folderName && $0.url == url
+        }
+        
+        if isDuplicate {
+            // 显示重复提示
+            let duplicateAlert = UIAlertController(title: "提示", message: "该文件夹已存在", preferredStyle: .alert)
+            duplicateAlert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(duplicateAlert, animated: true)
+            return
+        }
+        
         // 显示加载提示
         let alert = UIAlertController(title: "扫描中", message: "正在扫描文件夹...", preferredStyle: .alert)
         present(alert, animated: true)
@@ -1222,33 +1240,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 // 关闭加载提示
                 alert.dismiss(animated: true)
                 
-                // 检查是否已存在同名文件夹
                 if let newRoot = newRootItem {
-                    let isDuplicate = self.rootDirectoryItems.contains {
-                        $0.name == newRoot.name && $0.url == newRoot.url
-                    }
+                    // 添加到根目录列表
+                    self.rootDirectoryItems.append(newRoot)
+                    print("[MusicListViewController] 成功添加新的根目录: \(newRoot.name)")
                     
-                    if !isDuplicate {
-                        // 添加到根目录列表
-                        self.rootDirectoryItems.append(newRoot)
-                        print("[MusicListViewController] 成功添加新的根目录: \(newRoot.name)")
-                        
-                        // 更新UI显示
-                        self.updateDisplayItems()
-                        
-                        // 立即持久化保存更新后的目录状态
-                        self.saveMusicList()
-                        
-                        // 显示成功提示
-                        let successAlert = UIAlertController(title: "成功", message: "文件夹已添加到列表", preferredStyle: .alert)
-                        successAlert.addAction(UIAlertAction(title: "确定", style: .default))
-                        self.present(successAlert, animated: true)
-                    } else {
-                        // 显示重复提示
-                        let duplicateAlert = UIAlertController(title: "提示", message: "该文件夹已存在", preferredStyle: .alert)
-                        duplicateAlert.addAction(UIAlertAction(title: "确定", style: .default))
-                        self.present(duplicateAlert, animated: true)
-                    }
+                    // 更新UI显示
+                    self.updateDisplayItems()
+                    
+                    // 立即持久化保存更新后的目录状态
+                    self.saveMusicList()
+                    
+                    // 显示成功提示
+                    let successAlert = UIAlertController(title: "成功", message: "文件夹已添加到列表", preferredStyle: .alert)
+                    successAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                    self.present(successAlert, animated: true)
                 } else {
                     // 扫描失败
                     let errorAlert = UIAlertController(title: "错误", message: "无法扫描文件夹内容", preferredStyle: .alert)
