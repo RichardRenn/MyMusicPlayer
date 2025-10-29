@@ -53,10 +53,26 @@ class MusicItem {
 }
 
 // 播放模式枚举
-enum PlayMode {
+enum PlayMode: Int, CaseIterable {
     case sequence // 顺序播放
     case repeatOne // 单曲循环
     case shuffle // 随机播放
+    
+    // 持久化相关键名
+    private static let userDefaultsKey = "MusicPlayer_PlayMode"
+    static let rangeLockKey = "MusicPlayer_RangeLock"
+    
+    // 保存播放模式到用户数据
+    func save() {
+        UserDefaults.standard.set(self.rawValue, forKey: Self.userDefaultsKey)
+        print("🎵 [MusicPlayer] 播放模式已保存: \(self)")
+    }
+    
+    // 从用户数据加载播放模式
+    static func load() -> PlayMode {
+        let savedValue = UserDefaults.standard.integer(forKey: Self.userDefaultsKey)
+        return PlayMode(rawValue: savedValue) ?? .sequence // 默认顺序播放
+    }
 }
 
 class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
@@ -71,8 +87,8 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0
     @Published var totalTime: TimeInterval = 0
-    @Published var playMode: PlayMode = .sequence
-    @Published var isRangeLocked: Bool = false // 是否锁定播放范围在当前目录
+    @Published var playMode: PlayMode = PlayMode.load() // 从用户数据加载播放模式
+    @Published var isRangeLocked: Bool = false // 初始化为false，在init中加载
     
     // 完整播放列表和当前目录播放列表
     private var fullPlaylist: [MusicItem] = []
@@ -84,8 +100,11 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     private var progressTimer: Timer?
     
     override init() {
+        // 从用户数据加载播放范围锁定状态
+        isRangeLocked = UserDefaults.standard.bool(forKey: PlayMode.rangeLockKey)
         super.init()
         setupAudioSession()
+        print("🎵 [MusicPlayer] 从用户数据加载播放范围锁定状态: \(isRangeLocked)")
     }
     
     // 设置音频会话
@@ -476,11 +495,19 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         case .shuffle:
             playMode = .sequence
         }
+        
+        // 保存切换后的播放模式
+        playMode.save()
+        print("🎵 [MusicPlayer] 播放模式已切换为: \(playMode)")
     }
     
     // 切换播放范围锁定
     func toggleRangeLock() {
         isRangeLocked.toggle()
+        
+        // 保存切换后的播放范围锁定状态
+        UserDefaults.standard.set(isRangeLocked, forKey: PlayMode.rangeLockKey)
+        print("🎵 [MusicPlayer] 播放范围锁定状态已保存: \(isRangeLocked)")
         
         // 更新当前目录播放列表
         if isRangeLocked && currentMusic != nil {
@@ -495,6 +522,8 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         
         // 重置随机索引
         resetShuffleIndices()
+        
+        print("🎵 [MusicPlayer] 播放范围锁定状态已切换为: \(isRangeLocked)")
     }
     
     // 重置随机播放索引

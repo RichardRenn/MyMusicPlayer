@@ -63,6 +63,45 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         return label
     }()
     
+    private let scanningTipsLabel: UILabel = {
+        let label = UILabel()
+        label.text = "正在很努力的打开歌曲库 请稍等下下～"
+        label.font = UIFont.systemFont(ofSize: 13)
+        label.textColor = .secondaryLabel
+        label.textAlignment = .center
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let tipsLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 13)
+        label.textColor = .secondaryLabel
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // 提示文本数组
+    private let tipsArray = [
+        "文件夹左滑可以删除哦～",
+        "歌曲较多时会显示加载进度 请稍等下下～",
+        "锁定可以控制只在歌曲所在目录循环播放呢～",
+        "右上角眼睛图标可以让页面更清爽～",
+        "轻点下方的歌曲名来快速定位到歌曲位置～",
+        "点一下播放横幅空白处可以进入歌词详情～"
+    ]
+    
+    // 当前提示索引
+    private var currentTipIndex: Int = 0
+    
+    // 提示切换定时器
+    private var tipsTimer: Timer?
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -72,6 +111,57 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         
         // 加载并应用保存的主题设置
         loadSavedTheme()
+        
+        // 设置初始提示文本
+        tipsLabel.text = tipsArray[0]
+        
+        // 启动提示滚动效果
+        startTipsScrolling()
+    }
+    
+    // 启动提示文本滚动效果
+    private func startTipsScrolling() {
+        // 先停止已有的定时器
+        stopTipsScrolling()
+        
+        // 创建新的定时器，每3秒切换一次提示
+        tipsTimer = Timer.scheduledTimer(timeInterval: 3, target: self, selector: #selector(showNextTip), userInfo: nil, repeats: true)
+    }
+    
+    // 停止提示文本滚动
+    private func stopTipsScrolling() {
+        tipsTimer?.invalidate()
+        tipsTimer = nil
+    }
+    
+    // 显示下一条提示
+    @objc private func showNextTip() {
+        // 记录初始位置
+        let originalFrame = tipsLabel.frame
+        
+        // 当前提示向上滑出并淡出
+        UIView.animate(withDuration: 0.5) {
+            self.tipsLabel.transform = CGAffineTransform(translationX: 0, y: -20)
+            self.tipsLabel.alpha = 0.0
+        } completion: { [weak self] _ in
+            guard let self = self else { return }
+            
+            // 更新索引
+            self.currentTipIndex = (self.currentTipIndex + 1) % self.tipsArray.count
+            
+            // 设置新的提示文本
+            self.tipsLabel.text = self.tipsArray[self.currentTipIndex]
+            
+            // 重置位置并设置为从下方进入的初始状态
+            self.tipsLabel.transform = CGAffineTransform(translationX: 0, y: 20)
+            self.tipsLabel.alpha = 0.0
+            
+            // 新提示从下方滑入并淡入
+            UIView.animate(withDuration: 0.5) {
+                self.tipsLabel.transform = .identity
+                self.tipsLabel.alpha = 1.0
+            }
+        }
     }
     
     // 加载保存的主题设置
@@ -215,6 +305,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                         DispatchQueue.main.async {
                             self.progressView.isHidden = false
                             self.progressLabel.isHidden = false
+                            self.scanningTipsLabel.isHidden = false
                             self.selectButton.isHidden = true
                         }
                         
@@ -338,11 +429,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                             print("[ViewController] [持久化] 成功获取文件夹访问权限")
                             
                             // 显示进度条并隐藏选择按钮
-                            DispatchQueue.main.async {
-                                self.progressView.isHidden = false
-                                self.progressLabel.isHidden = false
-                                self.selectButton.isHidden = true
-                            }
+                                DispatchQueue.main.async {
+                                    self.progressView.isHidden = false
+                                    self.progressLabel.isHidden = false
+                                    self.scanningTipsLabel.isHidden = false
+                                    self.selectButton.isHidden = true
+                                }
                             
                             // 立即开始扫描
                             self.musicScanner.scanDirectory(savedURL, progressHandler: { progress in
@@ -360,6 +452,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                     // 隐藏进度条
                                     self.progressView.isHidden = true
                                     self.progressLabel.isHidden = true
+                                    self.scanningTipsLabel.isHidden = true
+                                    self.scanningTipsLabel.isHidden = true
                                     
                                     if let rootItem = rootDirectoryItem {
                                         print("[ViewController] [持久化] 扫描完成，找到文件夹: \(rootItem.name)")
@@ -397,6 +491,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         view.addSubview(selectButton)
         view.addSubview(progressView)
         view.addSubview(progressLabel)
+        view.addSubview(scanningTipsLabel)
+        view.addSubview(tipsLabel)
         
         // 设置约束
         NSLayoutConstraint.activate([
@@ -416,12 +512,23 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             
             // 进度条
             progressView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            progressView.topAnchor.constraint(equalTo: selectButton.bottomAnchor, constant: 50),
+            progressView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            // progressView.topAnchor.constraint(equalTo: selectButton.bottomAnchor, constant: 50),
             progressView.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -40),
             
             // 进度标签
             progressLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            progressLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 8)
+            progressLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 8),
+            
+            // 扫描提示标签
+            scanningTipsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            scanningTipsLabel.topAnchor.constraint(equalTo: progressLabel.bottomAnchor, constant: 8),
+            
+            // 布局约束
+            tipsLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            tipsLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            tipsLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            tipsLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 20) // 确保有足够高度显示文本
         ])
     }
     
@@ -469,6 +576,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         // 显示进度条并隐藏选择按钮
         progressView.isHidden = false
         progressLabel.isHidden = false
+        scanningTipsLabel.isHidden = false
         selectButton.isHidden = true
         
         // 逐个扫描所有选中的URL并收集结果
@@ -503,6 +611,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                         // 隐藏进度条
                         self.progressView.isHidden = true
                         self.progressLabel.isHidden = true
+                        self.scanningTipsLabel.isHidden = true
                         
                         // 扫描完成
                         if !rootDirectoryItems.isEmpty {
