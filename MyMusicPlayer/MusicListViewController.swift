@@ -53,11 +53,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 主题相关
     private var currentThemeMode: ThemeMode = .system
-    private let themeButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
     
     // 文件夹图标显示控制
     private var showFolderIcons: Bool = true { 
@@ -65,11 +60,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             saveFolderIconSetting()
         }
     }
-    private let folderIconToggleButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
     
     // UI元素
     // 展开/收起歌词按钮
@@ -334,18 +324,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 设置导航栏右侧按钮（眼睛图标按钮和主题切换按钮）
         
-        // 设置眼睛图标按钮
-        folderIconToggleButton.setImage(UIImage(systemName: showFolderIcons ? "eye" : "eye.slash"), for: .normal)
-        folderIconToggleButton.addTarget(self, action: #selector(folderIconToggleButtonTapped), for: .touchUpInside)
-        let folderIconBarButton = UIBarButtonItem(customView: folderIconToggleButton)
-        
-        // 设置主题按钮
-        themeButton.setImage(UIImage(systemName: currentThemeMode.iconName), for: .normal)
-        themeButton.addTarget(self, action: #selector(themeButtonTapped), for: .touchUpInside)
-        let themeBarButton = UIBarButtonItem(customView: themeButton)
-        
-        // 设置右侧按钮组
-        // 眼睛图标按钮不受开关控制，始终显示
+        // 初始化右侧导航栏按钮
         updateRightBarButtonsVisibility()
         
         // 添加表格视图
@@ -731,13 +710,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 切换显示状态
         showFolderIcons.toggle()
         
-        // 更新按钮图标
-        folderIconToggleButton.setImage(UIImage(systemName: showFolderIcons ? "eye" : "eye.slash"), for: .normal)
-        
         // 刷新表格视图
         tableView.reloadData()
         
-        // 更新导航栏按钮可见性
+        // 更新导航栏按钮可见性（包括更新眼睛图标）
         updateLeftBarButtonsVisibility()
         updateRightBarButtonsVisibility()
     }
@@ -766,12 +742,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 更新右侧导航栏按钮可见性
     private func updateRightBarButtonsVisibility() {
-        // 眼睛图标按钮不受开关控制，始终显示
-        let folderIconBarButton = UIBarButtonItem(customView: folderIconToggleButton)
+        // 直接使用UIBarButtonItem创建眼睛图标按钮
+        let folderIconImage = UIImage(systemName: showFolderIcons ? "eye" : "eye.slash")
+        let folderIconBarButton = UIBarButtonItem(image: folderIconImage, style: .plain, target: self, action: #selector(folderIconToggleButtonTapped))
+        folderIconBarButton.width = 32
         
         // 主题按钮受开关控制
         if showFolderIcons {
-            let themeBarButton = UIBarButtonItem(customView: themeButton)
+            let themeIconImage = UIImage(systemName: currentThemeMode.iconName)
+            let themeBarButton = UIBarButtonItem(image: themeIconImage, style: .plain, target: self, action: #selector(themeButtonTapped))
+            themeBarButton.width = 32
             navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
         } else {
             // 只保留眼睛图标按钮
@@ -784,8 +764,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 切换到下一个主题模式
         currentThemeMode = currentThemeMode.next()
         
-        // 更新按钮图标
-        themeButton.setImage(UIImage(systemName: currentThemeMode.iconName), for: .normal)
+        // 重新更新右侧按钮，确保图标正确更新
+        updateRightBarButtonsVisibility()
         
         // 应用新主题
         applyTheme()
