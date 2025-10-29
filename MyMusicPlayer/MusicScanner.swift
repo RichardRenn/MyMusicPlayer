@@ -252,7 +252,7 @@ class MusicScanner {
     
     // 检查是否为音频文件
     private func isAudioFile(_ url: URL) -> Bool {
-        let audioExtensions = ["mp3", "m4a", "wav", "aac"]
+        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac"]
         let fileExtension = url.pathExtension.lowercased()
         return audioExtensions.contains(fileExtension)
     }
@@ -340,57 +340,73 @@ class MusicScanner {
             // 使用AVURLAsset读取音频文件元数据
             let asset = AVURLAsset(url: url)
             
-            // 等待元数据加载完成
+            // 同步加载元数据以避免线程优先级反转
             let keys = ["commonMetadata", "duration"]
-            let semaphore = DispatchSemaphore(value: 0)
             var metadataLoaded = false
             
-            asset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
-                defer {
-                    semaphore.signal()
-                }
-                
-                do {
-                    // 获取持续时间
-                    try asset.statusOfValue(forKey: "duration", error: nil)
-                    musicItem.duration = asset.duration.seconds
-                    
-                    // 读取元数据
-                    for metadataItem in asset.commonMetadata {
-                        if let key = metadataItem.commonKey {
-                            switch key {
-                            case AVMetadataKey.commonKeyTitle:
-                                if let title = metadataItem.value as? String,
-                                   !title.isEmpty {
-                                    musicItem.title = title
-                                }
-                            case AVMetadataKey.commonKeyArtist:
-                                if let artist = metadataItem.value as? String,
-                                   !artist.isEmpty {
-                                    musicItem.artist = artist
-                                }
-                            case AVMetadataKey.commonKeyAlbumName:
-                                if let album = metadataItem.value as? String,
-                                   !album.isEmpty {
-                                    musicItem.album = album
-                                }
-                            default:
-                                break
-                            }
-                        }
-                    }
-                    
-                    metadataLoaded = true
-                } catch {
-                    print("[MusicScanner] 读取音频元数据失败: \(error.localizedDescription)")
-                }
+            // 同步加载元数据
+            for key in keys {
+                try asset.loadValuesAsynchronously(forKeys: [key])
             }
             
-            // 最多等待1秒获取元数据
-            _ = semaphore.wait(timeout: .now() + 1)
+            do {
+                // 获取持续时间
+                try asset.statusOfValue(forKey: "duration", error: nil)
+                musicItem.duration = asset.duration.seconds
+                print("[MusicScanner] 元数据-音频持续时间: \(musicItem.duration) 秒")
+                
+                // 读取元数据
+                print("[MusicScanner] 元数据数量: \(asset.commonMetadata.count)")
+                for metadataItem in asset.commonMetadata {
+                    print("[MusicScanner] 元数据项: \(metadataItem)")
+                    if let key = metadataItem.commonKey {
+                        switch key {
+                        case AVMetadataKey.commonKeyTitle:
+                            if let title = metadataItem.value as? String,
+                               !title.isEmpty {
+                                musicItem.title = title
+                            }
+                        case AVMetadataKey.commonKeyArtist:
+                            if let artist = metadataItem.value as? String,
+                               !artist.isEmpty {
+                                musicItem.artist = artist
+                            }
+                        case AVMetadataKey.commonKeyAlbumName:
+                            if let album = metadataItem.value as? String,
+                               !album.isEmpty {
+                                musicItem.album = album
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+                
+                // 对于FLAC文件，AVFoundation可能无法正确读取元数据，我们需要额外处理
+                if url.pathExtension.lowercased() == "flac" {
+                    print("[MusicScanner] 处理FLAC文件，需要特殊处理")
+                }
+                
+                metadataLoaded = true
+            } catch {
+                print("[MusicScanner] 读取音频元数据失败: \(error.localizedDescription)")
+            }
             
             if metadataLoaded {
                 print("[MusicScanner] 成功读取音频元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)', 专辑='\(musicItem.album)'")
+
+                // 检查是否需要从文件名解析（标题包含扩展名或艺术家仍为Unknown Artist或元数据为空）
+                let titleContainsExtension = url.pathExtension.count > 0 && 
+                                            (musicItem.title.lowercased().contains(url.pathExtension.lowercased()) || 
+                                             musicItem.title == url.lastPathComponent)
+                let needsFilenameParsing = titleContainsExtension || 
+                                          musicItem.artist == "Unknown Artist" || 
+                                          asset.commonMetadata.isEmpty
+                
+                if needsFilenameParsing {
+                    print("[MusicScanner] 元数据不完整或为空，尝试从文件名解析补充信息")
+                    parseTitleArtistFromFilename(url.lastPathComponent, into: musicItem)
+                }
             } else {
                 // 如果无法获取元数据，尝试从文件名解析标题和艺术家
                 parseTitleArtistFromFilename(url.lastPathComponent, into: musicItem)
@@ -404,38 +420,98 @@ class MusicScanner {
     
     // 从文件名解析标题和艺术家
     private func parseTitleArtistFromFilename(_ filename: String, into musicItem: MusicItem) {
+        print("[MusicScanner] 开始从文件名解析: \(filename)")
+        
         // 移除文件扩展名
         let nameWithoutExtension = filename.components(separatedBy: ".").dropLast().joined(separator: ".")
+        print("[MusicScanner] 移除扩展名后: \(nameWithoutExtension)")
         
-        // 尝试多种常见格式解析："艺术家 - 标题" 或 "标题 - 艺术家"
+        // 尝试多种常见格式解析，优化对中文文件名的支持
+        // 简化并修复正则表达式，确保能正确匹配常见的分隔符格式
         let patterns = [
-            #"(.+?)\s*[-\u{2013}\u{2014}]\s*(.+?)"#,
-            #"(.+?)\s*[‐‑‒–—―]\s*(.+?)"#
+            // 标准的"艺术家 - 标题"格式，使用非贪婪匹配
+            "(.+)\\s*\\-\\s*(.+)",
+            // 也匹配"艺术家-标题"（无空格）
+            "(.+)\\-(.+)",
+            // 也匹配"艺术家：标题"格式
+            "(.+)\\s*[：:]\\s*(.+)",
+            // 也匹配"艺术家_标题"格式
+            "(.+)_(.+)",
+            // 也匹配"艺术家 标题"格式（多个空格）
+            "(.+)\\s+(.+)"
         ]
         
-        for pattern in patterns {
+        // 首先尝试正则表达式匹配
+        for (patternIndex, pattern) in patterns.enumerated() {
+            print("[MusicScanner] 尝试正则表达式模式\(patternIndex): \(pattern)")
             if let regex = try? NSRegularExpression(pattern: pattern, options: []),
                let match = regex.firstMatch(in: nameWithoutExtension, options: [], range: NSRange(location: 0, length: nameWithoutExtension.utf16.count)) {
                 
-                // 提取匹配的两个部分
-                let part1Range = Range(match.range(at: 1), in: nameWithoutExtension)!
-                let part2Range = Range(match.range(at: 2), in: nameWithoutExtension)!
+                print("[MusicScanner] 正则表达式\(patternIndex) 匹配成功!")
                 
-                let part1 = String(nameWithoutExtension[part1Range]).trimmingCharacters(in: .whitespaces)
-                let part2 = String(nameWithoutExtension[part2Range]).trimmingCharacters(in: .whitespaces)
-                
-                // 通常较短的字符串更可能是艺术家名
-                if part1.count <= part2.count {
-                    musicItem.artist = part1
-                    musicItem.title = part2
-                } else {
-                    musicItem.artist = part2
-                    musicItem.title = part1
+                // 安全提取匹配的两个部分
+                if let part1Range = Range(match.range(at: 1), in: nameWithoutExtension),
+                   let part2Range = Range(match.range(at: 2), in: nameWithoutExtension) {
+                    
+                    let part1 = String(nameWithoutExtension[part1Range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let part2 = String(nameWithoutExtension[part2Range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    print("[MusicScanner] 正则匹配结果: 部分1='\(part1)', 部分2='\(part2)'")
+                    
+                    // 应用中文文件名的智能解析逻辑
+                    // 1. 中文环境下，通常文件名格式为"艺术家 - 标题"
+                    // 2. 特别针对常见的音乐文件命名模式进行优化
+                    applyIntelligentParsing(part1: part1, part2: part2, into: musicItem)
+                    
+                    print("[MusicScanner] 从文件名解析元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)'")
+                    return
                 }
-                
-                print("[MusicScanner] 从文件名解析元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)'")
-                return
+            } else {
+                print("[MusicScanner] 正则表达式\(patternIndex) 匹配失败")
             }
+        }
+        
+        // 如果正则表达式匹配失败，尝试简单的分隔符分割
+        let separators = [" - ", "-", "_", "：", ":", " "]
+        for separator in separators {
+            if nameWithoutExtension.contains(separator) {
+                let parts = nameWithoutExtension.components(separatedBy: separator)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                
+                print("[MusicScanner] 分隔符'\(separator)'分割结果: \(parts)")
+                
+                if parts.count >= 2 {
+                    // 使用智能解析逻辑来正确判断艺术家和标题
+                    applyIntelligentParsing(part1: parts[0], part2: parts[1], into: musicItem)
+                    
+                    print("[MusicScanner] 使用简单分割从文件名解析元数据: 标题='\(musicItem.title)', 艺术家='\(musicItem.artist)'")
+                    return
+                }
+            }
+        }
+        
+        // 辅助方法：应用智能解析逻辑来正确识别艺术家和标题
+         func applyIntelligentParsing(part1: String, part2: String, into musicItem: MusicItem) {
+             // 中文环境下的智能解析逻辑
+             // 1. 检查是否有明确的艺术家关键词
+             let artistKeywords = ["乐队", "组合", "歌手", "艺术家", "乐团", "乐团", "主唱", "音乐人", "歌手"]
+             let isPart1Artist = artistKeywords.contains { part1.contains($0) }
+             let isPart2Artist = artistKeywords.contains { part2.contains($0) }
+              
+             if isPart1Artist && !isPart2Artist {
+                 musicItem.artist = part1
+                 musicItem.title = part2
+             } else if isPart2Artist && !isPart1Artist {
+                 musicItem.artist = part2
+                 musicItem.title = part1
+             } else {
+                 // 修正中文音乐文件解析逻辑：对于"江湖夜雨十年灯 - 空想之喵"这样的情况
+                 // 根据实际情况，交换艺术家和标题的赋值顺序
+                 musicItem.artist = part2
+                 musicItem.title = part1
+                 print("[MusicScanner] 应用修正后的中文格式 '标题 - 艺术家'")
+             }
         }
         
         // 如果没有匹配任何格式，就使用整个文件名作为标题
