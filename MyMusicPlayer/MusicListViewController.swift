@@ -228,6 +228,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 启用应用生命周期通知
         registerAppLifeCycleNotifications()
+        
+        // 监听从歌词详情页返回的通知
+        NotificationCenter.default.addObserver(self, selector: #selector(handleMusicPlayerReturn), name: NSNotification.Name("MusicPlayerReturned"), object: nil)
     }
     
     // 注册应用生命周期通知
@@ -237,6 +240,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 应用即将终止通知
         NotificationCenter.default.addObserver(self, selector: #selector(saveMusicListOnTerminate), name: UIApplication.willTerminateNotification, object: nil)
+    }
+    
+    // 处理从歌词详情页返回的通知
+    @objc private func handleMusicPlayerReturn() {
+        // 如果歌词是展开状态，则立即刷新位置
+        if isLyricsExpanded {
+            updateLyricDisplay()
+        }
     }
     
     // 保存音乐列表
@@ -1506,15 +1517,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
         
         if newIndex != currentLyricIndex {
-            currentLyricIndex = newIndex
+            // 确保索引在有效范围内
+            currentLyricIndex = min(max(newIndex, 0), lyrics.count - 1)
             
             // 如果歌词面板是展开的，更新UI
             if isLyricsExpanded {
-                lyricsTableView.reloadData()
-                
-                // 自动滚动到当前歌词
-                let indexPath = IndexPath(row: currentLyricIndex, section: 0)
-                lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
+                // 滚动到当前歌词行，使其居中显示
+                lyricsTableView.scrollToRow(at: IndexPath(row: currentLyricIndex, section: 0), at: .middle, animated: true)
+                lyricsTableView.reloadData() // 刷新表格以更新高亮状态
             }
         }
     }

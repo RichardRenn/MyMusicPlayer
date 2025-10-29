@@ -212,6 +212,11 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 添加底部横幅
         view.addSubview(bottomBanner)
+        
+        // 为底部横幅添加点击手势，点击时返回列表页
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(backButtonTapped))
+        bottomBanner.addGestureRecognizer(tapGesture)
+        bottomBanner.isUserInteractionEnabled = true
         bottomBanner.addSubview(progressView) // 保留但隐藏
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
@@ -469,6 +474,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     // 按钮点击事件处理
     @objc private func backButtonTapped() {
+        // 发送返回通知，让列表页能感知返回事件
+        NotificationCenter.default.post(name: NSNotification.Name("MusicPlayerReturned"), object: nil)
+        
         // 使用popViewController返回上一个页面
         navigationController?.popViewController(animated: true)
     }
