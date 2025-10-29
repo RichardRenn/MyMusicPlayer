@@ -396,10 +396,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 改为15%
             
-            // 歌曲标题 - 靠左显示
+            // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
-            songTitleLabel.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 12), // 固定12像素顶部边距
+            songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8), // 进度条上方8像素
             
             // 合并的按钮组 - 居中显示
             allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
@@ -444,6 +444,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(bottomBannerTapped))
         bottomBanner.addGestureRecognizer(tapGesture)
         bottomBanner.isUserInteractionEnabled = true
+        
+        // 为歌曲标题添加点击手势，用于快速定位到列表中的歌曲
+        let titleTapGesture = UITapGestureRecognizer(target: self, action: #selector(songTitleTapped))
+        songTitleLabel.addGestureRecognizer(titleTapGesture)
+        songTitleLabel.isUserInteractionEnabled = true
+        songTitleLabel.isAccessibilityElement = true
+        songTitleLabel.accessibilityLabel = "点击定位到当前播放歌曲"
         
         setupPlayerObservers()
         setupButtonActions()
@@ -668,6 +675,44 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 跳转到播放详情页面
         let playerVC = MusicPlayerViewController(music: currentMusic)
         navigationController?.pushViewController(playerVC, animated: true)
+    }
+    
+    // 歌曲标题点击事件 - 快速定位到列表中的歌曲
+    @objc private func songTitleTapped() {
+        guard let currentMusic = musicPlayer.currentMusic else { return }
+        
+        // 先展开歌曲所在的所有父文件夹
+        expandParentDirectories(for: currentMusic)
+        
+        // 在更新后的displayItems中查找当前播放的歌曲
+        for (index, item) in displayItems.enumerated() {
+            if let (musicFile, _) = item as? (MusicItem, Int), musicFile.url == currentMusic.url {
+                // 找到了对应的歌曲，滚动到该位置并添加短暂的高亮效果
+                let indexPath = IndexPath(row: index, section: 0)
+                tableView.selectRow(at: indexPath, animated: true, scrollPosition: .middle)
+                
+                // 0.5秒后取消选中状态，提供视觉反馈
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.tableView.deselectRow(at: indexPath, animated: true)
+                }
+                
+                return
+            }
+        }
+    }
+    
+    // 展开指定音乐文件所在的所有父文件夹
+    private func expandParentDirectories(for musicFile: MusicItem) {
+        var parent = musicFile.parentDirectory
+        while let directory = parent {
+            if !directory.isExpanded {
+                directory.isExpanded = true
+            }
+            parent = directory.parentDirectory
+        }
+        
+        // 更新显示列表以反映文件夹展开状态的变化
+        updateDisplayItems()
     }
     
     // 底部控制按钮事件
