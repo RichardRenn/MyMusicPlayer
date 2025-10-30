@@ -44,12 +44,12 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.maximumTrackTintColor = .systemGray3
         slider.thumbTintColor = .tintColor
         
-        // 自定义滑块外观为圆角矩形
+        // 自定义滑块外观为圆形
         let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
             let ctx = context.cgContext
             ctx.setFillColor(UIColor.tintColor.cgColor)
             let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
-            let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+            let path = UIBezierPath(ovalIn: rect)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }

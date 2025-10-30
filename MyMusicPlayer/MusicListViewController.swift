@@ -82,7 +82,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.98) // 与底部横幅统一背景色
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
-        view.layer.cornerRadius = 12
+        view.layer.cornerRadius = 24
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只设置顶部两个角为圆角
         return view
     }()
@@ -166,12 +166,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         slider.maximumTrackTintColor = .systemGray3
         slider.thumbTintColor = .tintColor
         
-        // 自定义滑块外观为圆角矩形
+        // 自定义滑块外观为圆形
         let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
             let ctx = context.cgContext
             ctx.setFillColor(UIColor.tintColor.cgColor)
             let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
-            let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+            let path = UIBezierPath(ovalIn: rect)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
@@ -385,16 +385,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // bottomBanner.layer.shadowOpacity = 0.1 // 阴影不透明度为 0.1（很淡的阴影）
         // bottomBanner.layer.shadowRadius = 4 // 阴影的模糊半径
         // bottomBanner.layer.masksToBounds = true // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
-        bottomBanner.layer.cornerRadius = 12 // 让视图的角变圆，半径是 12
+        bottomBanner.layer.cornerRadius = 24 // 让视图的角变圆，半径是 24
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
         
         // 设置约束 - 全部使用百分比实现自适应布局
         NSLayoutConstraint.activate([
-            // 表格视图 - 底部留出空间给悬浮横幅
+            // 表格视图 - 底部连接到底部横幅的顶部，确保不超过横幅底部
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor),
             
             // 展开/收起按钮
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
