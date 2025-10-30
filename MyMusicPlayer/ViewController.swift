@@ -1,5 +1,6 @@
 import UIKit
 import Foundation
+import UniformTypeIdentifiers
 
 #if canImport(Foundation)
 // 尝试使用Foundation框架来模拟持久化功能
@@ -137,9 +138,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     // 显示下一条提示
     @objc private func showNextTip() {
-        // 记录初始位置
-        let originalFrame = tipsLabel.frame
-        
         // 当前提示向上滑出并淡出
         UIView.animate(withDuration: 0.5) {
             self.tipsLabel.transform = CGAffineTransform(translationX: 0, y: -20)
@@ -537,7 +535,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     // 选择文件夹按钮点击事件
     @objc private func selectButtonTapped() {
-        let documentPicker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        let documentPicker: UIDocumentPickerViewController
+        
+        // 使用iOS 14.0及以上推荐的API，回退到旧API以支持较早版本
+        if #available(iOS 14, *) {
+            documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+        } else {
+            documentPicker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        }
+        
         documentPicker.delegate = self
         documentPicker.allowsMultipleSelection = true
         
@@ -651,49 +657,49 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                         // 验证书签数据
                                         if !bookmarkData.isEmpty {
                                             bookmarksToSave.append(bookmarkData)
-                                            print("[持久化] 成功创建文件夹\(index+1) 的书签，大小: \(bookmarkData.count)字节")
+                                            print("[ViewController] [持久化] 成功创建文件夹\(index+1) 的书签，大小: \(bookmarkData.count)字节")
                                         } else {
-                                            print("[持久化] 创建文件夹\(index+1) 的书签为空数据")
+                                            print("[ViewController] [持久化] 创建文件夹\(index+1) 的书签为空数据")
                                         }
                                     } catch {
-                                        print("[持久化] 创建文件夹\(index+1) 的书签失败: \(error.localizedDescription)")
-                                        print("[持久化] 错误详情: \(error)")
+                                        print("[ViewController] [持久化] 创建文件夹\(index+1) 的书签失败: \(error.localizedDescription)")
+                                        print("[ViewController] [持久化] 错误详情: \(error)")
                                     }
                                 }
                                 
                                 // 创建后的状态确认
-                                print("[持久化] 书签创建过程完成，总共创建\(bookmarksToSave.count)/\(grantedURLs.count)个书签")
+                                print("[ViewController] [持久化] 书签创建过程完成，总共创建\(bookmarksToSave.count)/\(grantedURLs.count)个书签")
                                 
                                 for (idx, bookmark) in bookmarksToSave.enumerated() {
-                                    print("[持久化] 待保存书签\(idx+1) - 数据类型: \(type(of: bookmark)), 大小: \(bookmark.count)字节")
+                                    print("[ViewController] [持久化] 待保存书签\(idx+1) - 数据类型: \(type(of: bookmark)), 大小: \(bookmark.count)字节")
                                     // 打印前几个字节的十六进制表示，用于验证数据一致性
                                     let prefixSize = min(10, bookmark.count)
                                     let prefixData = bookmark.subdata(in: 0..<prefixSize)
                                     let hexDescription = prefixData.map { String(format: "%02x", $0) }.joined(separator: " ")
-                                    print("[持久化] 待保存书签\(idx+1) - 前10字节: \(hexDescription)")
+                                    print("[ViewController] [持久化] 待保存书签\(idx+1) - 前10字节: \(hexDescription)")
                                 }
                                 
                                 // 将bookmarkData数组保存到UserDefaults
                                 let encodedData = try JSONEncoder().encode(bookmarksToSave)
-                                print("[持久化] JSON编码后数据大小: \(encodedData.count)字节")
+                                print("[ViewController] [持久化] JSON编码后数据大小: \(encodedData.count)字节")
                                 
                                 UserDefaults.standard.set(encodedData, forKey: key)
                                 UserDefaults.standard.synchronize() // 确保立即保存
-                                print("[持久化] 已保存\(bookmarksToSave.count)个音乐目录安全书签到UserDefaults")
+                                print("[ViewController] [持久化] 已保存\(bookmarksToSave.count)个音乐目录安全书签到UserDefaults")
                                 
                                 // 立即验证保存是否成功
                                 if let savedData = UserDefaults.standard.data(forKey: key) {
                                     do {
                                         let decodedTest = try JSONDecoder().decode([Data].self, from: savedData)
-                                        print("[持久化] 立即验证: 成功读取到\(decodedTest.count)个书签")
+                                        print("[ViewController] [持久化] 立即验证: 成功读取到\(decodedTest.count)个书签")
                                     } catch {
-                                        print("[持久化] 立即验证失败: \(error.localizedDescription)")
+                                        print("[ViewController] [持久化] 立即验证失败: \(error.localizedDescription)")
                                     }
                                 } else {
-                                    print("[持久化] 立即验证失败: 无法读取保存的数据")
+                                    print("[ViewController] [持久化] 立即验证失败: 无法读取保存的数据")
                                 }
                             } catch {
-                                print("[持久化] 创建安全书签失败: \(error.localizedDescription)")
+                                print("[ViewController] [持久化] 创建安全书签失败: \(error.localizedDescription)")
                             }
                             
                             // 跳转到音乐列表页面，传入所有根目录项

@@ -48,16 +48,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
-        print("📱 [SceneDelegate] Scene进入后台状态，准备更新Now Playing信息")
+        print("[SceneDelegate] Scene进入后台状态，准备更新Now Playing信息")
         
         // 确保在后台也能接收远程控制
         // 更新一次Now Playing信息，确保在后台显示正确
         MusicPlayer.shared.updateNowPlayingInfo()
-        print("📱 [SceneDelegate] 后台状态下已调用updateNowPlayingInfo方法")
+        print("[SceneDelegate] 后台状态下已调用updateNowPlayingInfo方法")
         
         // 发送全局通知，通知所有监听者应用进入后台，以便保存数据
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
-        print("📱 [SceneDelegate] 已发送应用进入后台通知，触发数据保存操作")
+        print("[SceneDelegate] 已发送应用进入后台通知，触发数据保存操作")
     }
 
 }

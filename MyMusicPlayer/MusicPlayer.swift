@@ -65,7 +65,7 @@ enum PlayMode: Int, CaseIterable {
     // 保存播放模式到用户数据
     func save() {
         UserDefaults.standard.set(self.rawValue, forKey: Self.userDefaultsKey)
-        print("🎵 [MusicPlayer] 播放模式已保存: \(self)")
+        print("[MusicPlayer] 播放模式已保存: \(self)")
     }
     
     // 从用户数据加载播放模式
@@ -104,7 +104,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         isRangeLocked = UserDefaults.standard.bool(forKey: PlayMode.rangeLockKey)
         super.init()
         setupAudioSession()
-        print("🎵 [MusicPlayer] 从用户数据加载播放范围锁定状态: \(isRangeLocked)")
+        print("[MusicPlayer] 从用户数据加载播放范围锁定状态: \(isRangeLocked)")
     }
     
     // 设置音频会话
@@ -119,11 +119,11 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             // 使用options参数安全激活会话，避免系统音频设备冲突
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             
-            print("🎵 [MusicPlayer] 音频会话设置成功")
+            print("[MusicPlayer] 音频会话设置成功")
         } catch {
-            print("🎵 [MusicPlayer] 音频会话设置失败: \(error)")
+            print("[MusicPlayer] 音频会话设置失败: \(error)")
             // 错误2003332927通常表示Core Audio设备属性访问问题，记录详细信息便于调试
-            print("🎵 [MusicPlayer] 注意：如出现AQMEIO_HAL相关错误，通常是系统音频设备问题而非应用代码错误")
+            print("[MusicPlayer] 注意：如出现AQMEIO_HAL相关错误，通常是系统音频设备问题而非应用代码错误")
         }
     }
     
@@ -133,12 +133,12 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             // 使用相同的安全参数激活音频会话
             let session = AVAudioSession.sharedInstance()
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("🎵 [MusicPlayer] 尝试让应用成为活动媒体播放器")
+            print("[MusicPlayer] 尝试让应用成为活动媒体播放器")
         } catch {
-            print("🎵 [MusicPlayer] 无法激活音频会话: \(error)")
+            print("[MusicPlayer] 无法激活音频会话: \(error)")
             // 记录AQMEIO_HAL相关错误信息
             if let nserror = error as? NSError, nserror.domain == NSOSStatusErrorDomain {
-                print("🎵 [MusicPlayer] Core Audio错误代码: \(nserror.code)，这通常是系统音频设备问题")
+                print("[MusicPlayer] Core Audio错误代码: \(nserror.code)，这通常是系统音频设备问题")
             }
         }
     }
@@ -198,13 +198,13 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             }
         } else {
             // 当前音乐为nil，使用完整播放列表
-            print("🎵 [MusicPlayer] 当前播放音乐为nil，使用完整播放列表")
+            print("[MusicPlayer] 当前播放音乐为nil，使用完整播放列表")
             newPlaylist = fullPlaylist
         }
         
         // 确保播放列表有效，避免空数组问题
         if newPlaylist.isEmpty {
-            print("🎵 [MusicPlayer] 播放列表为空，重置索引")
+            print("[MusicPlayer] 播放列表为空，重置索引")
             currentDirectoryPlaylist = []
             currentIndex = -1
             return
@@ -219,7 +219,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
                 currentIndex = newIndex
             } else {
                 // 如果找不到当前音乐，设置索引为0
-                print("🎵 [MusicPlayer] 在新播放列表中找不到当前音乐，重置为第一首")
+                print("[MusicPlayer] 在新播放列表中找不到当前音乐，重置为第一首")
                 currentIndex = 0
             }
         } else {
@@ -243,7 +243,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         if url.startAccessingSecurityScopedResource() {
             shouldStopAccess = true
             securityScopedResources.append(url)
-            print("🎵 [MusicPlayer] 成功获取音频文件访问权限: \(url.lastPathComponent)")
+            print("[MusicPlayer] 成功获取音频文件访问权限: \(url.lastPathComponent)")
         }
         
         do {
@@ -278,7 +278,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
                 self?.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
             }
         } catch {
-            print("🎵 [MusicPlayer] 播放音乐失败: \(error)")
+            print("[MusicPlayer] 播放音乐失败: \(error)")
             isPlaying = false
             
             // 如果播放失败，释放访问权限
@@ -370,7 +370,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         // 在主线程上更新Now Playing信息和发送状态改变通知
         DispatchQueue.main.async { [weak self] in
             self?.updateNowPlayingInfo()
-            print("🎵 [MusicPlayer] 已暂停播放并更新Now Playing信息")
+            print("[MusicPlayer] 已暂停播放并更新Now Playing信息")
             
             // 发送播放器状态改变通知，确保UI组件能响应状态变化
             NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
@@ -395,7 +395,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
                 self?.updateNowPlayingInfo()
             }
             
-            print("🎵 [MusicPlayer] 已恢复播放并更新Now Playing信息")
+            print("[MusicPlayer] 已恢复播放并更新Now Playing信息")
             
             // 发送播放器状态改变通知，确保UI组件能响应状态变化
             NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
@@ -431,7 +431,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     // 播放下一首
     func playNext() {
         guard !currentDirectoryPlaylist.isEmpty else { 
-            print("🎵 [MusicPlayer] 播放队列为空，无法播放下一曲")
+            print("[MusicPlayer] 播放队列为空，无法播放下一曲")
             return 
         }
         
@@ -462,7 +462,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
                 newIndex = shuffleIndices.removeFirst()
                 // 确保获取的索引在有效范围内
                 if newIndex < 0 || newIndex >= currentDirectoryPlaylist.count {
-                    print("🎵 [MusicPlayer] 随机索引无效，重置为第一首")
+                    print("[MusicPlayer] 随机索引无效，重置为第一首")
                     newIndex = 0
                 }
             } else {
@@ -475,7 +475,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
             let music = currentDirectoryPlaylist[newIndex]
             playMusic(music, at: newIndex)
         } else {
-            print("🎵 [MusicPlayer] 索引超出范围，无法播放下一曲")
+            print("[MusicPlayer] 索引超出范围，无法播放下一曲")
             // 重置为第一首
             if !currentDirectoryPlaylist.isEmpty {
                 let music = currentDirectoryPlaylist[0]
@@ -498,7 +498,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         
         // 保存切换后的播放模式
         playMode.save()
-        print("🎵 [MusicPlayer] 播放模式已切换为: \(playMode)")
+        print("[MusicPlayer] 播放模式已切换为: \(playMode)")
     }
     
     // 切换播放范围锁定
@@ -507,7 +507,7 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         
         // 保存切换后的播放范围锁定状态
         UserDefaults.standard.set(isRangeLocked, forKey: PlayMode.rangeLockKey)
-        print("🎵 [MusicPlayer] 播放范围锁定状态已保存: \(isRangeLocked)")
+        print("[MusicPlayer] 播放范围锁定状态已保存: \(isRangeLocked)")
         
         // 更新当前目录播放列表
         if isRangeLocked && currentMusic != nil {
@@ -523,14 +523,14 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
         // 重置随机索引
         resetShuffleIndices()
         
-        print("🎵 [MusicPlayer] 播放范围锁定状态已切换为: \(isRangeLocked)")
+        print("[MusicPlayer] 播放范围锁定状态已切换为: \(isRangeLocked)")
     }
     
     // 重置随机播放索引
     private func resetShuffleIndices() {
         // 安全检查播放列表是否为空
         guard !currentDirectoryPlaylist.isEmpty else {
-            print("🎵 [MusicPlayer] 播放队列为空，无法重置随机索引")
+            print("[MusicPlayer] 播放队列为空，无法重置随机索引")
             shuffleIndices = []
             return
         }
@@ -571,9 +571,9 @@ class MusicPlayer: NSObject, AVAudioPlayerDelegate, ObservableObject {
     
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         if let err = error {
-            print("🎵 [MusicPlayer] 音频解码错误: \(err.localizedDescription)")
+            print("[MusicPlayer] 音频解码错误: \(err.localizedDescription)")
         } else {
-            print("🎵 [MusicPlayer] 音频解码错误: 未知错误")
+            print("[MusicPlayer] 音频解码错误: 未知错误")
         }
         isPlaying = false
     }

@@ -139,11 +139,6 @@ class LyricsParser {
         
         // 打印解析结果
         print("[LyricsParser] 歌词解析完成，共解析出 \(lyrics.count) 行歌词")
-        if !lyrics.isEmpty {
-            // 打印前3行歌词作为示例
-            let sampleLines = lyrics.prefix(3).map { "[\($0.time)] \($0.text)" }
-            // print("歌词示例:\n\(sampleLines.joined(separator: "\n"))")
-        }
         
         return lyrics
     }

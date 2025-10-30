@@ -117,7 +117,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     private let bottomBanner: UIView = {
         let view = UIView()
-        view.backgroundColor = .secondarySystemBackground
+        view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
         return view
@@ -128,6 +128,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.textAlignment = .left
         return label
     }()
     
@@ -171,19 +172,25 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.minimumTrackTintColor = .tintColor
+        slider.minimumTrackTintColor = .systemBlue
         slider.maximumTrackTintColor = .systemGray3
-        slider.thumbTintColor = .tintColor
         
-        // 自定义滑块外观为圆形
-        let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
+        // 设置滑块尺寸为14x14，形状为圆角矩形
+        let thumbSize = CGSize(width: 14, height: 14)
+        let cornerRadius: CGFloat = 4.5
+        let thumbImage = UIGraphicsImageRenderer(size: thumbSize).image { context in
             let ctx = context.cgContext
-            ctx.setFillColor(UIColor.tintColor.cgColor)
-            let rect = CGRect(x: 0, y: 0, width: 12, height: 12)
-            let path = UIBezierPath(ovalIn: rect)
+            
+            // 创建圆角矩形路径
+            let rect = CGRect(x: 0, y: 0, width: thumbSize.width, height: thumbSize.height)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
+            
+            // 填充内部，使用与进度条一致的颜色
+            ctx.setFillColor(UIColor.systemBlue.cgColor)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
+        
         slider.setThumbImage(thumbImage, for: .normal)
         slider.setThumbImage(thumbImage, for: .highlighted)
         
@@ -200,12 +207,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     private let timeLabel: UILabel = {
         let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 12)
+        label.textColor = .secondaryLabel
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
     private let totalTimeLabel: UILabel = {
         let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 12)
+        label.textColor = .secondaryLabel
+        label.textAlignment = .right
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -275,7 +287,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             if currentRootDirectoryItems.isEmpty {
                 // 没有目录时，从UserDefaults中删除数据键
                 defaults.removeObject(forKey: key)
-                print("[持久化] 所有目录已删除，清空保存的数据")
+                print("[MusicListVC] [持久化] 所有目录已删除，清空保存的数据")
                 return
             }
             
@@ -300,23 +312,23 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             do {
                 let data = try JSONEncoder().encode(bookmarksToSave)
                 defaults.set(data, forKey: key)
-                print("[持久化] 保存了\(bookmarksToSave.count)个目录书签数据")
+                print("[MusicListVC] [持久化] 保存了\(bookmarksToSave.count)个目录书签数据")
             } catch {
                 // 捕获编码错误
-                print("[持久化] 保存失败")
+                print("[MusicListVC] [持久化] 保存失败")
             }
         }
     }
     
     // 应用进入后台时保存音乐列表
     @objc private func saveMusicListOnBackground() {
-        print("📱 [MusicListVC] 应用进入后台，触发自动保存...")
+        print("[MusicListVC] 应用进入后台，触发自动保存...")
         saveMusicList()
     }
     
     // 应用即将终止时保存音乐列表
     @objc private func saveMusicListOnTerminate() {
-        print("📱 [MusicListVC] 应用即将终止，触发自动保存...")
+        print("[MusicListVC] 应用即将终止，触发自动保存...")
         saveMusicList()
     }
     
@@ -369,7 +381,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 添加底部横幅
         view.addSubview(bottomBanner)
         view.bringSubviewToFront(expandButton) // 确保展开按钮在横幅上方
-        bottomBanner.addSubview(songTitleLabel)
+        bottomBanner.addSubview(songTitleLabel) // 添加歌曲标题标签
         bottomBanner.addSubview(progressView) // 保留但隐藏
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
@@ -381,20 +393,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         allButtonsStack.axis = .horizontal
         allButtonsStack.alignment = .center
         allButtonsStack.distribution = .equalSpacing
-        allButtonsStack.spacing = 20
-        
-        // 设置歌曲标题文本靠左对齐
-        songTitleLabel.textAlignment = .left
+        allButtonsStack.spacing = 14
         
         bottomBanner.addSubview(allButtonsStack)
         
         // 为底部横幅添加悬浮样式和圆角
         bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
         // bottomBanner.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
-        // bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -1) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
-        // bottomBanner.layer.shadowOpacity = 0.1 // 阴影不透明度为 0.1（很淡的阴影）
-        // bottomBanner.layer.shadowRadius = 4 // 阴影的模糊半径
-        // bottomBanner.layer.masksToBounds = true // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
+        // bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -2) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
+        // bottomBanner.layer.shadowOpacity = 0.2 // 阴影不透明度为 0.1（很淡的阴影）
+        // bottomBanner.layer.shadowRadius = 1 // 阴影的模糊半径
+        // bottomBanner.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
         bottomBanner.layer.cornerRadius = 24 // 让视图的角变圆，半径是 24
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
         
@@ -422,7 +431,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             lyricsContainer.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor),
             lyricsContainer.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor),
             lyricsContainer.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor), // 直接连接到底部横幅顶部
-            lyricsContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.3), // 歌词面板高度为屏幕的30%
+            lyricsContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.17), // 歌词面板高度/屏幕高度占比
             
             // 歌词表格视图
             lyricsTableView.topAnchor.constraint(equalTo: lyricsPanel.topAnchor),
@@ -434,26 +443,22 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 高度保持15%
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.16), // 屏幕高度的16%
             
             // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8), // 进度条上方8像素
             
-            // 合并的按钮组 - 居中显示
-            allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -2), // 固定2像素底部边距
-            
             // 进度条（隐藏）- 相对于按钮组上方定位
             progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
+            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
             
             // 进度滑块 - 相对于按钮组上方定位
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
+            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -461,23 +466,27 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             
             totalTimeLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
             totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
+
+            // 合并的按钮组 - 居中显示
+            allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -1), // 固定1像素底部边距
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
             // 按钮大小约束 - 使用底部横幅高度的百分比
-            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
-            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
             
-            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
-            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
             
-            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
-            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
             
-            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
-            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
+            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
             
-            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
-            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5)
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45)
         ])
         
         // 设置tableView的底部内容边距，避免内容被横幅遮挡
@@ -515,6 +524,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         nextButton.addTarget(self, action: #selector(nextButtonTapped), for: .touchUpInside)
         playModeButton.addTarget(self, action: #selector(playModeButtonTapped), for: .touchUpInside)
         rangeLockButton.addTarget(self, action: #selector(rangeLockButtonTapped), for: .touchUpInside)
+        // 添加进度滑块事件
         progressSlider.addTarget(self, action: #selector(progressSliderValueChanged(_:)), for: .valueChanged)
         progressSlider.addTarget(self, action: #selector(progressSliderTouchBegan(_:)), for: .touchDown)
         progressSlider.addTarget(self, action: #selector(progressSliderTouchEnded(_:)), for: .touchUpInside)
@@ -528,19 +538,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 初始化进度条和时间标签
         progressView.progress = 0
-        progressView.tintColor = .systemBlue
-        progressView.trackTintColor = .systemGray3
         
         // 初始化进度滑块
         progressSlider.value = 0
         
         // 配置时间标签
-        timeLabel.font = UIFont.systemFont(ofSize: 12)
-        timeLabel.textColor = .secondaryLabel
         timeLabel.text = "00:00"
-        
-        totalTimeLabel.font = UIFont.systemFont(ofSize: 12)
-        totalTimeLabel.textColor = .secondaryLabel
         totalTimeLabel.text = "00:00"
     }
     
@@ -902,7 +905,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 获取应用窗口
     private var window: UIWindow? {
-        return UIApplication.shared.windows.first
+        if #available(iOS 15.0, *) {
+            // iOS 15及以上使用推荐的API
+            return UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?
+                .windows
+                .first
+        } else {
+            // 较早版本回退到旧API
+            return UIApplication.shared.windows.first
+        }
     }
     
     private var isSeeking = false // 标记是否正在手动拖动滑块
@@ -933,6 +946,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                         animations: {
                 self.lyricsPanel.alpha = 1.0
                 self.lyricsPanel.transform = .identity
+                // self.lyricsPanel.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
+                // self.lyricsPanel.layer.shadowOffset = CGSize(width: 0, height: -2) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
+                // self.lyricsPanel.layer.shadowOpacity = 0.2 // 阴影不透明度为 0.1（很淡的阴影）
+                // self.lyricsPanel.layer.shadowRadius = 1 // 阴影的模糊半径
+                // self.lyricsPanel.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
                 self.bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
                 self.bottomBanner.layoutIfNeeded()
                 self.updateButtonTrapezoidShape()
@@ -1115,16 +1133,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             } else {
                 songTitleLabel.text = currentMusic.title
             }
-            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
             
             // 更新播放/暂停按钮
             let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
             playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
             
-            // 更新播放模式按钮
+            // 更新播放模式和范围锁定按钮
             updatePlayModeButtonImage()
-            
-            // 更新范围锁定按钮
             updateRangeLockButtonImage()
             
             // 只有当用户不在拖动滑块时才更新UI
@@ -1133,8 +1148,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 let progress = Float(musicPlayer.currentTime / musicPlayer.totalTime)
                 progressView.progress = progress
                 progressSlider.value = progress
+
+                // 更新时间标签
                 timeLabel.text = formatTime(musicPlayer.currentTime)
             }
+
+            // 更新进度显示
+            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
             
             // 根据播放状态启动或停止计时器
             if musicPlayer.isPlaying {
@@ -1189,20 +1209,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         updateTimer = nil
     }
     
-    // 更新进度
-    @objc private func updateProgress() {
-        // 只有当用户不在拖动滑块时才更新UI
-        if !isSeeking {
-            let progress = musicPlayer.currentTime / musicPlayer.totalTime
-            progressView.progress = Float(progress)
-            progressSlider.value = Float(progress) // 同时更新滑块位置
-            timeLabel.text = formatTime(musicPlayer.currentTime)
-            
-            // 更新歌词高亮显示
-            updateCurrentLyricIndex()
-        }
-    }
-    
     // 格式化时间
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time / 60)
@@ -1254,7 +1260,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 添加文件夹按钮点击事件
     @objc private func addFolderButtonTapped() {
-        let documentPicker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        let documentPicker: UIDocumentPickerViewController
+        
+        // 使用iOS 14.0及以上推荐的API，回退到旧API以支持较早版本
+        if #available(iOS 14, *) {
+            documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+        } else {
+            documentPicker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        }
+        
         documentPicker.delegate = self
         documentPicker.allowsMultipleSelection = false
         
@@ -1563,33 +1577,26 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         }
     }
     
-
-    
-    // 处理歌词滚动，高亮当前播放的歌词
-    private func updateCurrentLyricIndex() {
-        guard !lyrics.isEmpty else { return }
-        
-        let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
-        
-        if newIndex != currentLyricIndex {
-            currentLyricIndex = newIndex
+    // 更新进度
+    @objc private func updateProgress() {
+        // 只有当用户不在拖动滑块时才更新UI
+        if !isSeeking {
+            let progress = musicPlayer.currentTime / musicPlayer.totalTime
+            progressView.progress = Float(progress)
+            progressSlider.value = Float(progress) // 同时更新滑块位置
             
-            // 如果歌词面板是展开的，更新UI
-            if isLyricsExpanded {
-                DispatchQueue.main.async {
-                    self.lyricsTableView.reloadData()
-                    
-                    // 自动滚动到当前歌词
-                    let indexPath = IndexPath(row: self.currentLyricIndex, section: 0)
-                    self.lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
-                }
-            }
+            // 更新时间标签
+            timeLabel.text = formatTime(musicPlayer.currentTime)
+            totalTimeLabel.text = formatTime(musicPlayer.totalTime)
+            
+            // 更新歌词显示
+            updateLyricDisplay()
         }
     }
     
     // 参照MusicPlayerViewController实现歌词更新显示方法
     private func updateLyricDisplay() {
-        if lyrics.isEmpty { return }
+        guard !lyrics.isEmpty else { return }
         
         let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
         
@@ -1605,8 +1612,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             }
         }
     }
-    
-    // 在updateProgress方法中调用updateCurrentLyricIndex来更新歌词显示
     
     // MARK: - 左滑删除功能实现
     

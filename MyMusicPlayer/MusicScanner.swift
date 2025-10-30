@@ -267,7 +267,6 @@ class MusicScanner {
     private func findLyricsFile(for audioURL: URL) -> URL? {
         let directory = audioURL.deletingLastPathComponent()
         let filenameWithoutExtension = audioURL.deletingPathExtension().lastPathComponent
-        let lyricsURL = directory.appendingPathComponent(filenameWithoutExtension + ".lrc")
         
         // 尝试多种可能的文件名格式（处理可能的空格、连字符等差异）
         let possibleLyricsFilenames = [
@@ -387,9 +386,11 @@ class MusicScanner {
                     print("[MusicScanner] 处理FLAC文件，需要特殊处理")
                 }
                 
+                // 元数据读取成功
                 metadataLoaded = true
             } catch {
                 print("[MusicScanner] 读取音频元数据失败: \(error.localizedDescription)")
+                metadataLoaded = false
             }
             
             if metadataLoaded {

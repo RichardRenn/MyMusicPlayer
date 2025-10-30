@@ -6,7 +6,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        print("📱 [AppDelegate] 应用启动中，配置控制中心功能")
+        print("[AppDelegate] 应用启动中，配置控制中心功能")
         
         // 配置远程控制
         setupRemoteCommandCenter()
@@ -16,13 +16,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     // 配置远程控制命令中心
     private func setupRemoteCommandCenter() {
-        print("📱 [AppDelegate] 设置MPRemoteCommandCenter")
+        print("[AppDelegate] 设置MPRemoteCommandCenter")
         
         let commandCenter = MPRemoteCommandCenter.shared()
         
         // 播放/暂停命令
         commandCenter.playCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心播放命令")
+            print("[AppDelegate] 收到控制中心播放命令")
             MusicPlayer.shared.resume()
             // 发送播放器状态变化通知，确保UI更新
             DispatchQueue.main.async {
@@ -33,7 +33,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         
         commandCenter.pauseCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心暂停命令")
+            print("[AppDelegate] 收到控制中心暂停命令")
             MusicPlayer.shared.pause()
             // 发送播放器状态变化通知，确保UI更新
             DispatchQueue.main.async {
@@ -45,26 +45,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // 上一首/下一首命令
         commandCenter.previousTrackCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心上一首命令")
+            print("[AppDelegate] 收到控制中心上一首命令")
             MusicPlayer.shared.playPrevious()
             return .success
         }
         
         commandCenter.nextTrackCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心下一首命令")
+            print("[AppDelegate] 收到控制中心下一首命令")
             MusicPlayer.shared.playNext()
             return .success
         }
         
         // 快进/快退命令
         commandCenter.seekForwardCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心快进命令")
+            print("[AppDelegate] 收到控制中心快进命令")
             // 这里可以实现快进逻辑
             return .success
         }
         
         commandCenter.seekBackwardCommand.addTarget { [weak self] event in
-            print("📱 [AppDelegate] 收到控制中心快退命令")
+            print("[AppDelegate] 收到控制中心快退命令")
             // 这里可以实现快退逻辑
             return .success
         }
@@ -75,7 +75,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.nextTrackCommand.isEnabled = true
         
-        print("📱 [AppDelegate] MPRemoteCommandCenter配置完成")
+        print("[AppDelegate] MPRemoteCommandCenter配置完成")
     }
 
     // MARK: UISceneSession Lifecycle
