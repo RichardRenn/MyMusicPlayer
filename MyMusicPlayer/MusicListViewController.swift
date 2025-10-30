@@ -79,9 +79,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 歌词面板
     private let lyricsPanel: UIView = {
         let view = UIView()
-        view.backgroundColor = .secondarySystemBackground
+        view.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.98) // 与底部横幅统一背景色
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
+        view.layer.cornerRadius = 12
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只设置顶部两个角为圆角
         return view
     }()
     
@@ -356,6 +358,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 添加底部横幅
         view.addSubview(bottomBanner)
+        view.bringSubviewToFront(expandButton) // 确保展开按钮在横幅上方
         bottomBanner.addSubview(songTitleLabel)
         bottomBanner.addSubview(progressView) // 保留但隐藏
         bottomBanner.addSubview(progressSlider) // 添加滑块
@@ -375,24 +378,34 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         bottomBanner.addSubview(allButtonsStack)
         
+        // 为底部横幅添加悬浮样式和圆角
+        bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
+        // bottomBanner.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
+        // bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -1) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
+        // bottomBanner.layer.shadowOpacity = 0.1 // 阴影不透明度为 0.1（很淡的阴影）
+        // bottomBanner.layer.shadowRadius = 4 // 阴影的模糊半径
+        // bottomBanner.layer.masksToBounds = true // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
+        bottomBanner.layer.cornerRadius = 12 // 让视图的角变圆，半径是 12
+        bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
+        
         // 设置约束 - 全部使用百分比实现自适应布局
         NSLayoutConstraint.activate([
-            // 表格视图
+            // 表格视图 - 底部留出空间给悬浮横幅
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: expandButton.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             // 展开/收起按钮
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             expandButton.widthAnchor.constraint(equalToConstant: 80),
             expandButton.heightAnchor.constraint(equalToConstant: 20),
-            expandButton.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor),
+            expandButton.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 20), // 调整位置
             
-            // 歌词面板
-            lyricsPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            lyricsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            lyricsPanel.bottomAnchor.constraint(equalTo: expandButton.topAnchor),
+            // 歌词面板 - 与底部横幅融合
+            lyricsPanel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor),
+            lyricsPanel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor),
+            lyricsPanel.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor), // 直接连接到底部横幅顶部
             lyricsPanel.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.3), // 歌词面板高度为屏幕的30%
             
             // 歌词表格视图
@@ -401,11 +414,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             lyricsTableView.trailingAnchor.constraint(equalTo: lyricsPanel.trailingAnchor),
             lyricsTableView.bottomAnchor.constraint(equalTo: lyricsPanel.bottomAnchor),
             
-            // 底部横幅 - 高度改为屏幕高度的15%
-            bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // 底部横幅 - 设置为悬浮样式，两侧留出空隙
+            bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 改为15%
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.15), // 高度保持15%
             
             // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -450,6 +463,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5),
             rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.5)
         ])
+        
+        // 设置tableView的底部内容边距，避免内容被横幅遮挡
+        tableView.contentInset.bottom = view.bounds.height * 0.15 + 16
         
         // 添加底部横幅的点击手势
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(bottomBannerTapped))
@@ -888,6 +904,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 更新梯形形状方向
         updateButtonTrapezoidShape()
+        
+        // 根据歌词展开/收起状态控制底部横幅圆角
+        if isLyricsExpanded {
+            // 歌词展开时，底部横幅只有下方两个角是圆角
+            bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        } else {
+            // 歌词收起时，底部横幅四个角都是圆角
+            bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
         
         // 加载歌词或保持当前位置
         if isLyricsExpanded {
