@@ -894,43 +894,61 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 切换歌词面板展开/收起状态
     @objc private func toggleLyricsPanel() {
         isLyricsExpanded.toggle()
-        
-        // 更新按钮图标
         let imageName = isLyricsExpanded ? "chevron.down" : "chevron.up"
         expandButton.setImage(UIImage(systemName: imageName), for: .normal)
-        
-        // 显示或隐藏歌词面板
-        lyricsPanel.isHidden = !isLyricsExpanded
-        
-        // 更新梯形形状方向
-        updateButtonTrapezoidShape()
-        
-        // 根据歌词展开/收起状态控制底部横幅圆角
+
+        // 确保布局已解析
+        view.layoutIfNeeded()
+
         if isLyricsExpanded {
-            // 歌词展开时，底部横幅只有下方两个角是圆角
-            bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-        } else {
-            // 歌词收起时，底部横幅四个角都是圆角
-            bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            // 显示歌词面板
+            lyricsPanel.isHidden = false
+            // 重置变换，确保从正确的位置开始动画
+            lyricsPanel.transform = CGAffineTransform(scaleX: 1.0, y: 0.0)
         }
-        
-        // 加载歌词或保持当前位置
-        if isLyricsExpanded {
-            if let currentMusic = musicPlayer.currentMusic {
-                // 只有在歌词未加载或歌曲改变时才重新加载歌词
-                if !lyricsLoaded || currentPlayingMusicURL != currentMusic.url {
-                    currentPlayingMusicURL = currentMusic.url
-                    loadLyrics()
-                } else {
-                    // 否则直接定位到当前播放位置
-                    updateLyricDisplay()
-                }
+
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseInOut, animations: {
+            // 使用简单的缩放动画
+            let scaleY: CGFloat = self.isLyricsExpanded ? 1.0 : 0.0
+            self.lyricsPanel.transform = CGAffineTransform(scaleX: 1.0, y: scaleY)
+
+            // 更新底部横幅的圆角
+            if self.isLyricsExpanded {
+                self.bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
             } else {
-                // 没有当前歌曲时加载默认歌词
-                loadLyrics()
+                self.bottomBanner.layer.maskedCorners = [
+                    .layerMinXMinYCorner, .layerMaxXMinYCorner,
+                    .layerMinXMaxYCorner, .layerMaxXMaxYCorner
+                ]
             }
-        }
+            self.bottomBanner.layoutIfNeeded()
+            self.updateButtonTrapezoidShape()
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if !self.isLyricsExpanded {
+                // 收起完成后隐藏
+                self.lyricsPanel.isHidden = true
+                // 重置变换
+                self.lyricsPanel.transform = .identity
+            }
+
+            // 加载或更新歌词
+            if self.isLyricsExpanded {
+                if let currentMusic = self.musicPlayer.currentMusic {
+                    if !self.lyricsLoaded || self.currentPlayingMusicURL != currentMusic.url {
+                        self.currentPlayingMusicURL = currentMusic.url
+                        self.loadLyrics()
+                    } else {
+                        self.updateLyricDisplay()
+                    }
+                } else {
+                    self.loadLyrics()
+                }
+            }
+        })
     }
+
+
     
     // 更新按钮的梯形形状
     private func updateButtonTrapezoidShape() {
