@@ -52,7 +52,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.minimumTrackTintColor = .systemBlue
+        slider.minimumTrackTintColor = .tintColor
         slider.maximumTrackTintColor = .systemGray3
         
         
@@ -67,7 +67,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
             
             // 填充内部，使用与进度条一致的颜色
-            ctx.setFillColor(UIColor.systemBlue.cgColor)
+            ctx.setFillColor(UIColor.tintColor.cgColor)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
