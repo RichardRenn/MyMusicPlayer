@@ -593,15 +593,22 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         var rootDirectoryItems: [DirectoryItem] = []
         var completedScans = 0
         let totalScans = grantedURLs.count
+        var lastUIUpdateTime: Date?
+        let minUIUpdateInterval: TimeInterval = 1.0 // 1秒更新一次UI，与MusicScanner保持一致的频率控制
         
         // 逐个扫描每个URL
         for (index, url) in grantedURLs.enumerated() {
             self.musicScanner.scanDirectory(url, progressHandler: { progress in
                 DispatchQueue.main.async {
-                    // 计算总体进度
-                    let overallProgress = (Float(completedScans) + Float(progress)) / Float(totalScans)
-                    self.progressView.progress = overallProgress
-                    self.progressLabel.text = "\(Int(overallProgress * 100))%"
+                    let currentTime = Date()
+                    // 只有在距离上次更新至少1秒时才更新UI
+                    if lastUIUpdateTime == nil || currentTime.timeIntervalSince(lastUIUpdateTime!) >= minUIUpdateInterval {
+                        // 计算总体进度
+                        let overallProgress = (Float(completedScans) + Float(progress)) / Float(totalScans)
+                        self.progressView.progress = overallProgress
+                        self.progressLabel.text = "\(Int(overallProgress * 100))%"
+                        lastUIUpdateTime = currentTime
+                    }
                 }
             }) { [weak self] (rootDirectoryItem) in
                 guard let self = self else { return }

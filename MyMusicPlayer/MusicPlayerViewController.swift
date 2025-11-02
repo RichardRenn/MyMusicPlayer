@@ -253,8 +253,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             // 底部横幅 - 修改为与列表页一致的布局
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), // 添加左侧边距
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16), // 添加右侧边距
-            bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.16), // 屏幕高度的16%
+            bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的16%
             
             // 波形图 - 水平居中显示，相对于进度条上方
             waveformView.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
@@ -270,12 +270,12 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             // 进度条（隐藏）- 相对于按钮组上方定位
             progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
             progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
+            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
             // 进度滑块 - 相对于按钮组上方定位
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
+            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
@@ -286,24 +286,24 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             
             // 合并的按钮组 - 居中显示
             allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -1), // 固定1像素底部边距
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -8), // 固定8像素底部边距
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
-            // 按钮大小约束
-            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            // 按钮大小约束 - 降低宽度乘数以避免约束冲突
+            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45)
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35)
         ])
     
         // 为底部横幅添加点击手势，点击时返回列表页
@@ -703,7 +703,7 @@ class WaveformView: UIView {
     }
     
     // 波形条的数量
-    private let barCount: Int = 24
+    private let barCount: Int = 10
     
     // 波形条的宽度
     private let barWidth: CGFloat = 3.0
@@ -742,7 +742,7 @@ class WaveformView: UIView {
     
     // 设置波形图
     private func setupWaveform() {
-        print("[WaveformView] 设置波形图开始")
+        // print("[WaveformView] 设置波形图开始")
         // 清空现有的波形条
         topBars.forEach { $0.removeFromSuperview() }
         bottomBars.forEach { $0.removeFromSuperview() }
@@ -807,7 +807,7 @@ class WaveformView: UIView {
             bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset).isActive = true
         }
         
-        print("[WaveformView] 波形图设置完成，创建了\(barCount * 2)个波形条（上下各\(barCount)个）")
+        // print("[WaveformView] 波形图设置完成，创建了\(barCount * 2)个波形条（上下各\(barCount)个）")
     }
     
     // 开始动画
@@ -820,8 +820,8 @@ class WaveformView: UIView {
         animationStartTime = Date().timeIntervalSince1970
         
         // 创建新的动画计时器
-        animationTimer = Timer.scheduledTimer(timeInterval: 0.2, target: self, selector: #selector(updateWaveform), userInfo: nil, repeats: true)
-        print("[WaveformView] 动画计时器已启动，间隔: 0.2秒")
+        animationTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(updateWaveform), userInfo: nil, repeats: true)
+        print("[WaveformView] 动画计时器已启动，间隔: 0.1秒")
     }
     
     // 停止动画
@@ -847,11 +847,6 @@ class WaveformView: UIView {
                 // 更新下半部分约束
                 let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: staticHeight)
                 bottomHeightConstraint.isActive = true
-                
-                // 只打印前几个条的高度变化，避免日志过多
-                if index < 5 {
-                    print("[WaveformView] 停止时重置条 \(index) 高度到: \(staticHeight)")
-                }
             }
             
             // 强制布局更新
@@ -903,11 +898,6 @@ class WaveformView: UIView {
             let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: targetHeight)
             bottomHeightConstraint.priority = .required
             bottomHeightConstraint.isActive = true
-            
-            // 只打印前几个条的高度变化，避免日志过多
-            if index < 2 {
-                print("[WaveformView] 条 \(index) 高度更新为: \(targetHeight)")
-            }
         }
         
         // 直接布局更新，不使用UIView.animate

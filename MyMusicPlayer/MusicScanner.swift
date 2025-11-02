@@ -10,6 +10,8 @@ class MusicScanner {
             // 检查URL是否需要访问权限
             var hasAccess = true
             var shouldStopAccess = false
+            var lastProgressUpdateTime: Date?
+            let minUpdateInterval: TimeInterval = 1.0 // 1秒更新一次，更严格控制频率
             
             // 如果URL是安全范围的资源，尝试请求访问权限
             if url.startAccessingSecurityScopedResource() {
@@ -119,13 +121,28 @@ class MusicScanner {
                                     itemURL.stopAccessingSecurityScopedResource()
                                 }
                                 
-                                // 更新处理的文件数和进度
+                                // 更新处理的文件数
                                 processedFilesCount += 1
+                                
+                                // 使用时间戳精确控制进度更新频率，每秒最多1次
                                 if totalFilesCount > 0 {
-                                    // 确保进度不会超过1.0 (100%)
-                                    let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
-                                    DispatchQueue.main.async {
-                                        progressHandler(progress)
+                                    let currentTime = Date()
+                                    // 只有在完成时或距离上次更新至少1秒时才更新
+                                    if processedFilesCount == totalFilesCount {
+                                        // 确保进度不会超过1.0 (100%)
+                                        let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
+                                        lastProgressUpdateTime = currentTime
+                                        DispatchQueue.main.async {
+                                            progressHandler(progress)
+                                        }
+                                    } else if lastProgressUpdateTime == nil || 
+                                              currentTime.timeIntervalSince(lastProgressUpdateTime!) >= minUpdateInterval {
+                                        // 1秒更新一次
+                                        let currentProgress = Double(processedFilesCount) / Double(totalFilesCount)
+                                        lastProgressUpdateTime = currentTime
+                                        DispatchQueue.main.async {
+                                            progressHandler(currentProgress)
+                                        }
                                     }
                                 }
                             } catch {
@@ -134,9 +151,13 @@ class MusicScanner {
                                 
                                 // 即使出错也计数，避免进度卡住
                                 processedFilesCount += 1
-                                if totalFilesCount > 0 {
+                                
+                                // 错误情况下不触发进度更新，只在成功处理时更新，进一步降低更新频率
+                                // 只在处理完所有文件时更新一次
+                                if totalFilesCount > 0 && processedFilesCount == totalFilesCount {
                                     // 确保进度不会超过1.0 (100%)
                                     let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
+                                    lastProgressUpdateTime = Date()
                                     DispatchQueue.main.async {
                                         progressHandler(progress)
                                     }
@@ -353,11 +374,8 @@ class MusicScanner {
                 try asset.statusOfValue(forKey: "duration", error: nil)
                 musicItem.duration = asset.duration.seconds
                 print("[MusicScanner] 元数据-音频持续时间: \(musicItem.duration) 秒")
-                
-                // 读取元数据
-                print("[MusicScanner] 元数据数量: \(asset.commonMetadata.count)")
+
                 for metadataItem in asset.commonMetadata {
-                    print("[MusicScanner] 元数据项: \(metadataItem)")
                     if let key = metadataItem.commonKey {
                         switch key {
                         case AVMetadataKey.commonKeyTitle:

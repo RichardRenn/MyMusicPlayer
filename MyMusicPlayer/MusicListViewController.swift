@@ -442,8 +442,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 底部横幅 - 设置为悬浮样式，两侧留出空隙
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.16), // 屏幕高度的16%
+            bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的16%
             
             // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -453,12 +453,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 进度条（隐藏）- 相对于按钮组上方定位
             progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
+            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
             // 进度滑块 - 相对于按钮组上方定位
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -6), // 按钮组上方6像素
+            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -469,24 +469,24 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
 
             // 合并的按钮组 - 居中显示
             allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -1), // 固定1像素底部边距
+            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -8), // 固定8像素底部边距
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
-            // 按钮大小约束 - 使用底部横幅高度的百分比
-            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            // 按钮大小约束 - 使用底部横幅高度的百分比（降低乘数以避免约束冲突）
+            previousButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            previousButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playPauseButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            playPauseButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            nextButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            nextButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
+            playModeButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            playModeButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
             
-            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45),
-            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.45)
+            rangeLockButton.widthAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35),
+            rangeLockButton.heightAnchor.constraint(equalTo: bottomBanner.heightAnchor, multiplier: 0.35)
         ])
         
         // 设置tableView的底部内容边距，避免内容被横幅遮挡
