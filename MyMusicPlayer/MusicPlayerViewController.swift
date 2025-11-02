@@ -60,7 +60,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.minimumTrackTintColor = .tintColor
+        // 根据设备型号设置不同颜色
+        let isiPhone13Mini = UIScreen.main.bounds.size == CGSize(width: 375, height: 812) && UIDevice.current.userInterfaceIdiom == .phone
+        slider.minimumTrackTintColor = isiPhone13Mini ? .systemBlue : .tintColor
         slider.maximumTrackTintColor = .systemGray3
         
         
@@ -75,7 +77,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
             
             // 填充内部，使用与进度条一致的颜色
-            ctx.setFillColor(UIColor.tintColor.cgColor)
+            ctx.setFillColor(isiPhone13Mini ? UIColor.systemBlue.cgColor : UIColor.tintColor.cgColor)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
