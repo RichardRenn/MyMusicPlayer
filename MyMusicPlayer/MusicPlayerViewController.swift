@@ -36,14 +36,22 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         return view
     }()
     
-    // 添加歌曲标题标签，与列表页保持一致
+    // 波形图视图 - 替换歌曲标题标签
+    private let waveformView: WaveformView = {
+        let view = WaveformView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .clear
+        return view
+    }()
+    
+    // 保留歌曲标题标签但默认隐藏
     private let songTitleLabel: UILabel = {
         let label = UILabel()
         label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
         label.textAlignment = .left
-        // label.isHidden = true
+        label.isHidden = true
         return label
     }()
     
@@ -207,7 +215,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 添加底部横幅
         view.addSubview(bottomBanner)
-        bottomBanner.addSubview(songTitleLabel) // 添加歌曲标题标签
+        bottomBanner.addSubview(waveformView) // 添加波形图视图
+        bottomBanner.addSubview(songTitleLabel) // 保留歌曲标题标签但默认隐藏
         bottomBanner.addSubview(progressView) // 保留但隐藏
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
@@ -247,7 +256,13 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.16), // 屏幕高度的16%
             
-            // 歌曲标题 - 靠左显示，相对于进度条上方
+            // 波形图 - 水平居中显示，相对于进度条上方
+            waveformView.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
+            waveformView.widthAnchor.constraint(equalTo: bottomBanner.widthAnchor, multiplier: 0.8),
+            waveformView.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8),
+            waveformView.heightAnchor.constraint(equalToConstant: 30),
+            
+            // 歌曲标题 - 靠左显示，相对于进度条上方（默认隐藏）
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
             songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32),
             songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8),
@@ -296,7 +311,12 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         bottomBanner.addGestureRecognizer(tapGesture)
         bottomBanner.isUserInteractionEnabled = true
         
-        // 为歌曲标题添加点击手势
+        // 为波形图添加点击手势
+        let waveformTapGesture = UITapGestureRecognizer(target: self, action: #selector(backButtonTapped))
+        waveformView.addGestureRecognizer(waveformTapGesture)
+        waveformView.isUserInteractionEnabled = true
+        
+        // 为歌曲标题添加点击手势（虽然默认隐藏）
         let titleTapGesture = UITapGestureRecognizer(target: self, action: #selector(backButtonTapped))
         songTitleLabel.addGestureRecognizer(titleTapGesture)
         songTitleLabel.isUserInteractionEnabled = true
@@ -426,12 +446,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     // 更新UI
     private func updateUI() {
         
-        // 设置歌曲标题标签的初始文本
+        // 设置歌曲标题标签的初始文本（虽然默认隐藏）
         if !music.artist.isEmpty && music.artist != "Unknown Artist" {
             songTitleLabel.text = "\(music.title) - \(music.artist)"
         } else {
             songTitleLabel.text = music.title
         }
+        
+        // 更新波形图动画状态
+        print("[MusicPlayerViewController] 更新波形图动画状态: \(musicPlayer.isPlaying)")
+        waveformView.isAnimating = musicPlayer.isPlaying
 
         // 根据当前播放状态更新播放/暂停按钮图标
         let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
@@ -461,7 +485,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
 
             self.music = currentMusic // 更新当前控制器的music引用
             
-            // 更新歌曲标题标签
+            // 更新歌曲标题标签（虽然默认隐藏）
             songTitleLabel.text = title
             
             // 重新加载歌词
@@ -470,6 +494,10 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             // 更新播放/暂停按钮
             let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
             playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
+            
+            // 更新波形图动画状态
+            print("[MusicPlayerViewController] updatePlayerUI - 设置波形图动画状态: \(musicPlayer.isPlaying)")
+            waveformView.isAnimating = musicPlayer.isPlaying
             
             // 更新播放模式和范围锁定按钮
             updatePlayModeButtonImage()
@@ -656,5 +684,242 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 50 // 固定行高，使歌词显示更美观
+    }
+}
+
+// 波形图视图 - 简单模拟音量变化的波形效果
+class WaveformView: UIView {
+    
+    // 是否正在动画
+    var isAnimating: Bool = false {
+        didSet {
+            print("[WaveformView] isAnimating changed to: \(isAnimating)")
+            if isAnimating {
+                startAnimating()
+            } else {
+                stopAnimating()
+            }
+        }
+    }
+    
+    // 波形条的数量
+    private let barCount: Int = 24
+    
+    // 波形条的宽度
+    private let barWidth: CGFloat = 3.0
+    
+    // 波形条之间的间距
+    private let barSpacing: CGFloat = 4.0
+    
+    // 波形条的颜色
+    private let barColor: UIColor = .tintColor
+    
+    // 上半部分波形条数组
+    private var topBars: [UIView] = []
+    
+    // 下半部分波形条数组
+    private var bottomBars: [UIView] = []
+    
+    // 动画计时器
+    private var animationTimer: Timer?
+    
+    // 基础波形高度数组（确保为正数）
+    private var baseHeights: [CGFloat] = []
+    
+    // 动画开始时间
+    private var animationStartTime: TimeInterval = 0
+    
+    // 初始化
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupWaveform()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupWaveform()
+    }
+    
+    // 设置波形图
+    private func setupWaveform() {
+        print("[WaveformView] 设置波形图开始")
+        // 清空现有的波形条
+        topBars.forEach { $0.removeFromSuperview() }
+        bottomBars.forEach { $0.removeFromSuperview() }
+        topBars.removeAll()
+        bottomBars.removeAll()
+        baseHeights.removeAll()
+        
+        // 计算可用宽度并调整间距
+        let availableWidth = bounds.width
+        let totalBarWidth = CGFloat(barCount) * barWidth
+        let totalSpacing = CGFloat(barCount - 1) * barSpacing
+        
+        var effectiveSpacing = barSpacing
+        if totalBarWidth + totalSpacing > availableWidth {
+            effectiveSpacing = max(1.0, (availableWidth - totalBarWidth) / CGFloat(barCount - 1))
+            print("[WaveformView] 调整间距为: \(effectiveSpacing)")
+        }
+        
+        // 创建波形条（上下对称）
+        for i in 0..<barCount {
+            // 生成基础高度（确保为正数）
+            let baseHeight = 5.0 + 8.0 * abs(sin(Double(i) * 0.3 + Double.random(in: 0...1)))
+            baseHeights.append(CGFloat(baseHeight))
+            
+            // 创建上半部分波形条 - 只保留顶部圆角
+            let topBar = UIView()
+            topBar.backgroundColor = barColor
+            topBar.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只设置顶部两个角的圆角
+            topBar.layer.cornerRadius = barWidth / 2
+            topBar.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(topBar)
+            topBars.append(topBar)
+            
+            // 创建下半部分波形条 - 只保留底部圆角
+            let bottomBar = UIView()
+            bottomBar.backgroundColor = barColor
+            bottomBar.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 只设置底部两个角的圆角
+            bottomBar.layer.cornerRadius = barWidth / 2
+            bottomBar.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(bottomBar)
+            bottomBars.append(bottomBar)
+            
+            // 设置上半部分约束
+            NSLayoutConstraint.activate([
+                topBar.widthAnchor.constraint(equalToConstant: barWidth),
+                topBar.bottomAnchor.constraint(equalTo: centerYAnchor), // 从中间向上延伸（修改为bottomAnchor确保与中心线对齐）
+                topBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
+            ])
+            
+            // 设置下半部分约束
+            NSLayoutConstraint.activate([
+                bottomBar.widthAnchor.constraint(equalToConstant: barWidth),
+                bottomBar.topAnchor.constraint(equalTo: centerYAnchor), // 从中间向下延伸（修改为topAnchor确保与中心线对齐）
+                bottomBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
+            ])
+            
+            // 设置水平位置（上下条水平对齐，确保整体水平居中）
+            let totalWidth = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * effectiveSpacing
+            let startOffset = (bounds.width - totalWidth) / 2
+            let xOffset = startOffset + CGFloat(i) * (barWidth + effectiveSpacing)
+            topBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset).isActive = true
+            bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset).isActive = true
+        }
+        
+        print("[WaveformView] 波形图设置完成，创建了\(barCount * 2)个波形条（上下各\(barCount)个）")
+    }
+    
+    // 开始动画
+    private func startAnimating() {
+        print("[WaveformView] 开始动画")
+        // 停止之前的动画
+        stopAnimating()
+        
+        // 记录动画开始时间
+        animationStartTime = Date().timeIntervalSince1970
+        
+        // 创建新的动画计时器
+        animationTimer = Timer.scheduledTimer(timeInterval: 0.2, target: self, selector: #selector(updateWaveform), userInfo: nil, repeats: true)
+        print("[WaveformView] 动画计时器已启动，间隔: 0.2秒")
+    }
+    
+    // 停止动画
+    private func stopAnimating() {
+        print("[WaveformView] 停止动画")
+        animationTimer?.invalidate()
+        animationTimer = nil
+        
+        // 重置波形条高度 - 直接设置，不使用动画
+        DispatchQueue.main.async {
+            for (index, (topBar, bottomBar)) in zip(self.topBars, self.bottomBars).enumerated() {
+                // 移除旧的高度约束
+                NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
+                NSLayoutConstraint.deactivate(bottomBar.constraints.filter { $0.firstAttribute == .height })
+                
+                // 设置静态状态下的高度（稍微缩小的基础高度）
+                let staticHeight = max(0.0, self.baseHeights[index] * 0.9)
+                
+                // 更新上半部分约束
+                let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: staticHeight)
+                topHeightConstraint.isActive = true
+                
+                // 更新下半部分约束
+                let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: staticHeight)
+                bottomHeightConstraint.isActive = true
+                
+                // 只打印前几个条的高度变化，避免日志过多
+                if index < 5 {
+                    print("[WaveformView] 停止时重置条 \(index) 高度到: \(staticHeight)")
+                }
+            }
+            
+            // 强制布局更新
+            self.setNeedsLayout()
+            self.layoutIfNeeded()
+        }
+    }
+    
+    // 更新波形图
+    @objc private func updateWaveform() {
+        // 计算动画时间偏移
+        let currentTime = Date().timeIntervalSince1970
+        let animationTime = currentTime - animationStartTime
+        
+        // 使用不同频率的正弦波创建更自然的波形效果
+        let baseFrequency = 2.0
+        let secondaryFrequency = 5.0
+        let tertiaryFrequency = 0.5
+        
+        // 更新每个波形条
+        for (index, (topBar, bottomBar)) in zip(topBars, bottomBars).enumerated() {
+            // 为每个波形条生成独特的动画模式
+            let barOffset = Double(index) * 0.2
+            
+            // 主波形 - 快速变化
+            let primaryWave = sin(animationTime * baseFrequency + barOffset)
+            
+            // 次波形 - 中等变化
+            let secondaryWave = sin(animationTime * secondaryFrequency + barOffset * 0.5)
+            
+            // 基础波形 - 缓慢变化的基础高度
+            let baseWave = 0.5 + 0.5 * sin(animationTime * tertiaryFrequency + barOffset * 0.1)
+            
+            // 组合波形，确保为正数
+            let combinedWave = abs(primaryWave * 0.6 + secondaryWave * 0.4)
+            
+            // 计算最终高度，确保为正数且有最小高度
+            let targetHeight = max(0.0, baseHeights[index] * CGFloat(baseWave) * (0.8 + 1.2 * CGFloat(combinedWave)))
+            
+            // 移除旧的高度约束
+            NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
+            NSLayoutConstraint.deactivate(bottomBar.constraints.filter { $0.firstAttribute == .height })
+            
+            // 添加新的高度约束（上下对称）
+            let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: targetHeight)
+            topHeightConstraint.priority = .required
+            topHeightConstraint.isActive = true
+            
+            let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: targetHeight)
+            bottomHeightConstraint.priority = .required
+            bottomHeightConstraint.isActive = true
+            
+            // 只打印前几个条的高度变化，避免日志过多
+            if index < 2 {
+                print("[WaveformView] 条 \(index) 高度更新为: \(targetHeight)")
+            }
+        }
+        
+        // 直接布局更新，不使用UIView.animate
+        setNeedsLayout()
+        layoutIfNeeded()
+    }
+    
+    // 重写layoutSubviews以适应视图大小变化
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        // 重新设置波形图
+        setupWaveform()
     }
 }
