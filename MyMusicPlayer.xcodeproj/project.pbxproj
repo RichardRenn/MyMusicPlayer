@@ -19,6 +19,7 @@
 		22C512332A1B4C4400A1E52E /* (null) in Sources */ = {isa = PBXBuildFile; };
 		22C512352A1B4C4400A1E52E /* LyricsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C512342A1B4C4400A1E52E /* LyricsParser.swift */; };
 		79359ADD2EAA89C6007BE053 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 79359ADC2EAA89C6007BE053 /* Assets.xcassets */; };
+		797F155D2EB7B4DC00DC126C /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = 797F155C2EB7B4DC00DC126C /* AudioKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				797F155D2EB7B4DC00DC126C /* AudioKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,6 +134,9 @@
 				Base,
 			);
 			mainGroup = 22C512102A1B4C3D00A1E52E;
+			packageReferences = (
+				795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */,
+			);
 			productRefGroup = 22C512372A1B4C4E00A1E52E /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -494,6 +499,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AudioKit/AudioKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.6.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		797F155C2EB7B4DC00DC126C /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */;
+			productName = AudioKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 22C5120F2A1B4C3D00A1E52E /* Project object */;
 }

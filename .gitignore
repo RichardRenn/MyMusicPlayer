@@ -1,4 +1,4 @@
 # 忽略 Xcode 的用户设置和工作区
-*.xcworkspace/
+#*.xcworkspace/
 xcuserdata/
 
