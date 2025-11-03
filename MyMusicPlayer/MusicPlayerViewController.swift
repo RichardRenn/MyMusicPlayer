@@ -778,13 +778,13 @@ class WaveformView: UIView {
     }
     
     // 增加波形条数量以更好地展示频谱细节
-    private let barCount: Int = 61
+    private let barCount: Int = 41
     
     // 波形条的宽度
-    private let barWidth: CGFloat = 3.0
+    private let barWidth: CGFloat = 4.5
     
     // 波形条之间的间距
-    private let barSpacing: CGFloat = 2
+    private let barSpacing: CGFloat = 3
     
     // 波形条的颜色（使用渐变色增强视觉效果）
     private var gradientColors: [UIColor] = [
@@ -808,11 +808,11 @@ class WaveformView: UIView {
     // 最大波形高度（根据视图高度动态调整）
     private var maxBarHeight: CGFloat = 0
     
-    // 动画开始时间
-    private var animationStartTime: TimeInterval = 0
-    
     // 存储上一次的FFT数据，用于平滑过渡
     private var previousFFTData: [Float]? = nil
+    
+    // 快速滚动标志，用于暂停动画
+    public var isFastScrolling: Bool = false
     
     // 初始化
     override init(frame: CGRect) {
@@ -878,11 +878,20 @@ class WaveformView: UIView {
             topGradientLayers.append(topGradientLayer)
             
             // 设置上半部分约束 - 从底部向上延伸
-            NSLayoutConstraint.activate([
-                topBar.widthAnchor.constraint(equalToConstant: barWidth),
-                topBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5), // 从底部向上延伸，留出一点边距
-                topBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
-            ])
+            let widthConstraint = topBar.widthAnchor.constraint(equalToConstant: barWidth)
+            let bottomConstraint = topBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5) // 从底部向上延伸，留出一点边距
+            let heightConstraint = topBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
+            
+            // 设置高优先级
+            widthConstraint.priority = .required
+            bottomConstraint.priority = .required
+            heightConstraint.priority = .required
+            
+            // 激活约束
+            NSLayoutConstraint.activate([widthConstraint, bottomConstraint, heightConstraint])
+            
+            // 将高度约束添加到缓存中
+            topBarHeightConstraints[topBar] = heightConstraint
             
             // 设置水平位置，确保整体水平居中
             let totalWidth = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * effectiveSpacing
@@ -919,26 +928,20 @@ class WaveformView: UIView {
     
     // 停止动画（仍然保留以清理可能的资源）
     private func stopAnimating() {
-        print("[WaveformView] 停止使用实际FFT数据更新波形图")
         animationTimer?.invalidate()
         animationTimer = nil
         
-        // 重置波形条高度 - 直接设置，不使用动画
+        // 重置波形条高度 - 使用updateBarHeight方法保持一致性
         DispatchQueue.main.async {
             for (index, topBar) in self.topBars.enumerated() {
-                // 移除旧的高度约束
-                NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
-                
                 // 设置静态状态下的高度（稍微缩小的基础高度）
                 let staticHeight = max(0.0, self.baseHeights[index] * 0.9)
                 
-                // 更新上半部分约束
-                let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: staticHeight)
-                topHeightConstraint.isActive = true
+                // 使用统一的更新方法
+                self.updateBarHeight(topBar: topBar, height: staticHeight)
             }
             
             // 强制布局更新
-            self.setNeedsLayout()
             self.layoutIfNeeded()
         }
     }
@@ -951,20 +954,13 @@ class WaveformView: UIView {
     
     // 更新波形图（使用实际频谱数据）
     public func updateWithSpectrumData(_ fftData: [Float]) {
-        // 只有在动画模式下才处理数据和打印详细日志
-        if isAnimating {
-            print("[WaveformView] 接收到FFT数据 - 数量: \(fftData.count), isAnimating: true")
-        }
-        
         // 只有在动画模式下才处理数据
         guard isAnimating else {
-            // 在非动画模式下，完全停止处理，避免不必要的计算
             return
         }
         
         // 确保有足够的数据
         guard !fftData.isEmpty else {
-            print("[WaveformView] 警告: 接收到空的FFT数据")
             resetWaveformBars()
             return
         }
@@ -973,8 +969,7 @@ class WaveformView: UIView {
         let validFFTData = fftData.filter { !$0.isNaN && !$0.isInfinite && $0 >= 0 }
         
         // 确保有足够的有效数据
-        guard validFFTData.count > Int(Double(fftData.count) * 0.5) else { // 至少50%的数据有效
-            print("[WaveformView] 警告: FFT数据质量差，有效数据: \(validFFTData.count)/\(fftData.count)")
+        guard validFFTData.count > Int(Double(fftData.count) * 0.5) else {
             return
         }
         
@@ -989,68 +984,59 @@ class WaveformView: UIView {
                 return current * 0.4 + prev * 0.6 // 给当前数据40%权重，前一次数据60%权重
             }
         } else {
-            // 数据长度变化，直接使用当前数据
-            print("[WaveformView] FFT数据长度变化: 新长度=\(currentData.count), 重置平滑计算")
             smoothData = currentData
         }
         
         // 存储当前数据用于下次平滑
         previousFFTData = smoothData
         
-        // 更新每个波形条（只更新上半部分）
-        for (index, (topBar, topGradient)) in zip(topBars, topGradientLayers).enumerated() {
-            // 实现镜像对称效果：高音在中间，低音在两边
-            // 改进的镜像逻辑 - 避免中间出现空白
-            let centerPosition = CGFloat(barCount) / 2.0
-            let distanceFromCenter = abs(CGFloat(index) - centerPosition)
-            
-            // 将距离中心点的距离映射到0-1范围，0表示中间，1表示两侧
-            // 使用反向映射，使中间对应高频，两侧对应低频
-            let normalizedDistance = distanceFromCenter / centerPosition
-            
-            // 优化的FFT数据索引计算：基于距离中心点的距离来映射频谱数据
-            // 靠近中间的位置（normalizedDistance小）映射到高频（大索引）
-            // 远离中间的位置（normalizedDistance大）映射到低频（小索引）
-            // 直接使用normalizedDistance实现从低频到高频的映射
-            let linearIndex = Int(normalizedDistance * CGFloat(smoothData.count))
-            let fftIndex = min(max(linearIndex, 0), smoothData.count - 1)
-            let magnitude = smoothData[fftIndex]
-            
-            // 确保magnitude是有效值
-            guard !magnitude.isNaN && !magnitude.isInfinite && magnitude >= 0 else {
-                // 使用很小的值替代无效值
-                continue
+        // 更新UI操作
+        DispatchQueue.main.async {
+            // 更新每个波形条（只更新上半部分）
+            for (index, (topBar, topGradient)) in zip(self.topBars, self.topGradientLayers).enumerated() {
+                // 实现镜像对称效果：高音在中间，低音在两边
+                let centerPosition = CGFloat(self.barCount) / 2.0
+                let distanceFromCenter = abs(CGFloat(index) - centerPosition)
+                let normalizedDistance = distanceFromCenter / centerPosition
+                
+                // 优化的FFT数据索引计算
+                let linearIndex = Int(normalizedDistance * CGFloat(smoothData.count))
+                let fftIndex = min(max(linearIndex, 0), smoothData.count - 1)
+                let magnitude = smoothData[fftIndex]
+                
+                // 确保magnitude是有效值
+                guard !magnitude.isNaN && !magnitude.isInfinite && magnitude >= 0 else {
+                    continue
+                }
+                
+                // 改进的对数缩放
+                let logMagnitude = magnitude > 0 ? 20.0 * log10(max(magnitude, 1e-10)) : -120.0
+                
+                // 分贝映射范围
+                let minDecibels: Double = -80.0
+                let maxDecibels: Double = -10.0
+                
+                // 简化的归一化计算
+                let adjustedMagnitude = logMagnitude - Float(minDecibels)
+                let range = Float(maxDecibels) - Float(minDecibels)
+                let rawNormalized = adjustedMagnitude / range
+                let normalizedMagnitude = max(0.0, min(1.0, rawNormalized))
+                
+                // 计算最终高度
+                let dynamicHeight = self.maxBarHeight * CGFloat(normalizedMagnitude)
+                let targetHeight = self.baseHeights[index] + dynamicHeight
+                
+                // 更新波形条高度
+                self.updateBarHeight(topBar: topBar, height: targetHeight)
+                
+                // 更新渐变层frame
+                topGradient.frame = topBar.bounds
             }
             
-            // 改进的对数缩放，使用更适合人耳感知的映射
-            let logMagnitude = magnitude > 0 ? 20.0 * log10(max(magnitude, 1e-10)) : -120.0
-            
-            // 更优化的分贝映射范围，考虑音频的动态范围
-            // 使用-80dB到-10dB的范围，更好地捕捉音乐中的动态
-            let minDecibels: Double = -80.0
-            let maxDecibels: Double = -10.0
-            
-            // 将复杂表达式拆分成简单步骤，便于编译器类型检查
-            let adjustedMagnitude = logMagnitude - Float(minDecibels)
-            let range = Float(maxDecibels) - Float(minDecibels)
-            let rawNormalized = adjustedMagnitude / range
-            let normalizedMagnitude = max(0.0, min(1.0, rawNormalized))
-            
-            // 计算最终高度，结合基础高度和频谱数据
-            let dynamicHeight = maxBarHeight * CGFloat(normalizedMagnitude)
-            let targetHeight = baseHeights[index] + dynamicHeight
-            
-            // 更新波形条高度
-            updateBarHeight(topBar: topBar, height: targetHeight)
-            
-            // 更新渐变层frame
-            topGradient.frame = topBar.bounds
-        }
-        
-        // 使用动画使波形变化更平滑
-        UIView.animate(withDuration: 0.05, delay: 0, options: .curveEaseOut) {
-            self.setNeedsLayout()
-            self.layoutIfNeeded()
+            // 执行动画
+            UIView.animate(withDuration: 0.05, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+                self.layoutIfNeeded()
+            }
         }
     }
     
@@ -1075,32 +1061,40 @@ class WaveformView: UIView {
         // 清除之前的FFT数据缓存
         previousFFTData = nil
         
-        for (index, (topBar, topGradient)) in zip(topBars, topGradientLayers).enumerated() {
-            // 使用静止状态的高度（更小，更稳定）
-            let staticHeight = max(0.0, baseHeights[index] * 0.5)
-            updateBarHeight(topBar: topBar, height: staticHeight)
+        // 更新操作
+        DispatchQueue.main.async {
+            for (index, (topBar, topGradient)) in zip(self.topBars, self.topGradientLayers).enumerated() {
+                // 使用静止状态的高度（更小，更稳定）
+                let staticHeight = max(0.0, self.baseHeights[index] * 0.5)
+                self.updateBarHeight(topBar: topBar, height: staticHeight)
+                
+                // 更新渐变层frame
+                topGradient.frame = topBar.bounds
+            }
             
-            // 更新渐变层frame
-            topGradient.frame = topBar.bounds
-        }
-        
-        // 使用动画平滑过渡到静止状态
-        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseInOut) {
-            self.setNeedsLayout()
-            self.layoutIfNeeded()
+            // 使用动画平滑过渡到静止状态
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {        
+                self.layoutIfNeeded()
+            }
         }
     }
     
-    // 更新单个波形条的高度
+    // 更新单个波形条的高度 - 使用transform替代约束，提高性能
     private func updateBarHeight(topBar: UIView, height: CGFloat) {
-        // 移除旧的高度约束
-        NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
-        
-        // 添加新的高度约束
-        let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: height)
-        topHeightConstraint.priority = .required
-        topHeightConstraint.isActive = true
+        // 缓存基础高度约束，避免重复创建
+        if let existingHeightConstraint = topBarHeightConstraints[topBar] {
+            existingHeightConstraint.constant = height
+        } else {
+            // 只在首次创建时添加约束
+            let heightConstraint = topBar.heightAnchor.constraint(equalToConstant: height)
+            heightConstraint.priority = .required
+            heightConstraint.isActive = true
+            topBarHeightConstraints[topBar] = heightConstraint
+        }
     }
+    
+    // 缓存高度约束的字典
+    private var topBarHeightConstraints: [UIView: NSLayoutConstraint] = [:]
     
     // 更新单个波形条的约束
     private func updateBarConstraints() {
