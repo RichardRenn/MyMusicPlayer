@@ -177,18 +177,19 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 添加左滑手势支持返回功能
         setupSwipeGesture()
+        
+        // 初始化波形图显示状态
+        updateWaveformVisibility()
+        
+        // 监听眼镜开关状态变化
+        NotificationCenter.default.addObserver(self, selector: #selector(updateWaveformVisibility), name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 进入播放页时启用频谱分析
-        musicPlayer.isSpectrumAnalysisEnabled = true
-        print("[MusicPlayerViewController] 进入播放页，已启用频谱分析")
-        
-        // 如果正在播放，确保FFT分析器已启动
-        if musicPlayer.isPlaying {
-            musicPlayer.setupFFTAnalysis()
-        }
+        // 根据波形图显示状态决定是否启用频谱分析
+        updateWaveformVisibility()
+        print("[MusicPlayerViewController] 进入播放页，已根据波形图显示状态设置频谱分析")
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -196,6 +197,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 离开播放页时禁用频谱分析，节省性能
         musicPlayer.isSpectrumAnalysisEnabled = false
         print("[MusicPlayerViewController] 离开播放页，已禁用频谱分析")
+        
+        // 移除通知监听
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
         
         // 确保波形图停止动画
         waveformView.isAnimating = false
@@ -213,6 +217,31 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         if gesture.state == .recognized || gesture.state == .ended {
             // 执行与返回按钮相同的操作
             backButtonTapped()
+        }
+    }
+    
+    // 更新波形图显示状态
+    @objc private func updateWaveformVisibility() {
+        // 从UserDefaults中读取眼镜开关状态
+        let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
+        waveformView.isHidden = !showWaveform
+        
+        // 根据波形图显示状态控制频谱分析计算
+        if !showWaveform {
+            // 如果波形图隐藏，禁用频谱分析计算并停止动画
+            musicPlayer.isSpectrumAnalysisEnabled = false
+            waveformView.stopAnimating()
+            print("[MusicPlayerViewController] 波形图隐藏，已禁用频谱分析计算")
+        } else {
+            // 如果波形图显示，启用频谱分析计算
+            musicPlayer.isSpectrumAnalysisEnabled = true
+            print("[MusicPlayerViewController] 波形图显示，已启用频谱分析计算")
+            
+            // 如果正在播放，启动动画并重新设置FFT分析
+            if musicPlayer.isPlaying {
+                waveformView.startAnimating()
+                musicPlayer.setupFFTAnalysis()
+            }
         }
     }
     
@@ -922,12 +951,12 @@ class WaveformView: UIView {
     }
     
     // 不再需要启动动画方法，因为我们使用实际FFT数据
-    private func startAnimating() {
+    internal func startAnimating() {
         print("[WaveformView] 开始使用实际FFT数据更新波形图")
     }
     
     // 停止动画（仍然保留以清理可能的资源）
-    private func stopAnimating() {
+    internal func stopAnimating() {
         animationTimer?.invalidate()
         animationTimer = nil
         

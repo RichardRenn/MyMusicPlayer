@@ -11,7 +11,7 @@ class MusicScanner {
             var hasAccess = true
             var shouldStopAccess = false
             var lastProgressUpdateTime: Date?
-            let minUpdateInterval: TimeInterval = 1.0 // 1秒更新一次，更严格控制频率
+            let minUpdateInterval: TimeInterval = 0.5 // 严格控制更新频率
             
             // 如果URL是安全范围的资源，尝试请求访问权限
             if url.startAccessingSecurityScopedResource() {

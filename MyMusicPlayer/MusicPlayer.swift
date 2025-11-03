@@ -157,7 +157,7 @@ class MusicPlayer: NSObject, ObservableObject {
                         // 添加调试信息，检查FFT数据
                         let maxValue = validFFTData.max() ?? 0
                         let avgValue = validFFTData.reduce(0, +) / Float(validFFTData.count)
-                        // print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
+                        print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
                         self.lastFFTLogTime = currentTime
                     
                         // 通过回调传递频谱数据

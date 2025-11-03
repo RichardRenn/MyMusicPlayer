@@ -807,6 +807,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 更新导航栏按钮可见性（包括更新眼镜图标）
         updateLeftBarButtonsVisibility()
         updateRightBarButtonsVisibility()
+        
+        // 发送通知，通知波形图更新显示状态
+        NotificationCenter.default.post(name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
     }
     
     // 保存文件夹图标设置
