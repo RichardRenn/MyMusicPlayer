@@ -443,7 +443,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的16%
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的14%
             
             // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距

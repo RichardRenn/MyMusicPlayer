@@ -322,7 +322,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), // 添加左侧边距
             bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16), // 添加右侧边距
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的16%
+            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的14%
             
             // 波形图 - 调整位置，确保在进度条上方且可见
             waveformView.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),

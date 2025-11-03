@@ -127,7 +127,7 @@ class MusicPlayer: NSObject, ObservableObject {
         
         // 设置FFT分析
         setupFFTAnalysis()
-        
+
         print("[MusicPlayer] AudioKit 初始化成功")
     }
     
@@ -157,7 +157,7 @@ class MusicPlayer: NSObject, ObservableObject {
                         // 添加调试信息，检查FFT数据
                         let maxValue = validFFTData.max() ?? 0
                         let avgValue = validFFTData.reduce(0, +) / Float(validFFTData.count)
-                        print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
+                        // print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
                         self.lastFFTLogTime = currentTime
                     
                         // 通过回调传递频谱数据
@@ -328,33 +328,30 @@ class MusicPlayer: NSObject, ObservableObject {
         }
         
         do {
-            // 统一使用安全的音频会话配置参数
+            // 音频会话仅在需要时激活
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            if !session.isOtherAudioPlaying {
+                try? session.setActive(true)
+            }
             
-            // 停止AudioKit播放器
-            player.stop()
-            
-            // 先停止FFT分析器，确保干净的状态切换
-            fftTap?.stop()
+            // 确保引擎已准备好
+            if !engine.avEngine.isRunning {
+                try? engine.start()
+            }
             
             // 使用AudioKit播放器
-            try engine.start()
             try player.load(url: url)
             player.play()
             
             isPlaying = true
             totalTime = player.duration
             
-            // 确保应用成为活动的媒体播放器
-            becomeActiveMediaPlayer()
+            // 重新建立 FFTTap
+            fftTap?.stop()
+            fftTap?.start()
             
             // 启动进度更新计时器
             startProgressTimer()
-            
-            // 在加载新音频后重新启动FFT分析器，确保正确连接到新的音频源
-            fftTap?.start()
             
             // 立即更新Now Playing信息
             DispatchQueue.main.async { [weak self] in
