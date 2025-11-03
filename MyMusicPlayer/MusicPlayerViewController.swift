@@ -192,6 +192,15 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         print("[MusicPlayerViewController] 进入播放页，已根据波形图显示状态设置频谱分析")
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 确保滑块位置与当前播放进度一致
+        let progress = Float(musicPlayer.currentTime / musicPlayer.totalTime)
+        progressSlider.value = progress
+        timeLabel.text = formatTime(musicPlayer.currentTime)
+        print("[MusicPlayerViewController] viewDidAppear - 同步滑块位置: \(progress)")
+    }
+    
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         // 离开播放页时禁用频谱分析，节省性能
@@ -249,6 +258,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         stopUpdateTimer()
         // 移除通知监听
         NotificationCenter.default.removeObserver(self, name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        NotificationCenter.default.removeObserver(self, name: .musicPlayerProgressChanged, object: nil)
     }
     
     // 设置UI
@@ -400,18 +410,36 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 监听当前播放音乐的变化
         NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: NSNotification.Name("PlayerStateChanged"), object: nil)
         
-        // 初始化进度条和时间标签
-        progressView.progress = 0
-        
-        // 初始化进度滑块
-        progressSlider.value = 0
+        // 监听进度更新通知，用于同步播放页拖动后的进度
+        NotificationCenter.default.addObserver(self, selector: #selector(handleProgressUpdateNotification), name: .musicPlayerProgressChanged, object: nil)
         
         // 配置时间标签
-        timeLabel.text = "00:00"
-        totalTimeLabel.text = "00:00"
+        timeLabel.text = formatTime(musicPlayer.currentTime)
+        totalTimeLabel.text = formatTime(musicPlayer.totalTime)
+        
+        // 初始化滑块位置
+        let progress = Float(musicPlayer.currentTime / max(musicPlayer.totalTime, 0.1)) // 防止除以0
+        progressSlider.value = progress
+        progressView.progress = progress
         
         // 设置频谱数据回调
         setupSpectrumDataCallback()
+    }
+    
+    // 处理进度更新通知
+    @objc private func handleProgressUpdateNotification(_ notification: Notification) {
+        if let userInfo = notification.userInfo,
+           let currentTime = userInfo["currentTime"] as? TimeInterval,
+           let totalTime = userInfo["totalTime"] as? TimeInterval {
+            
+            // 更新滑块和时间标签
+            let progress = Float(currentTime / max(totalTime, 0.1)) // 防止除以0
+            progressSlider.value = progress
+            timeLabel.text = formatTime(currentTime)
+            progressView.progress = progress
+            
+            print("[MusicPlayerViewController] 收到进度更新通知: \(currentTime)/\(totalTime)")
+        }
     }
     
     // 设置频谱数据回调

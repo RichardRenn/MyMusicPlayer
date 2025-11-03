@@ -749,11 +749,11 @@ class MusicPlayer: NSObject, ObservableObject {
         }
         
         // 无论原状态如何，都完全重新设置FFT分析器
-    // 这样在暂停状态下拖动进度条后再播放时，FFT分析器能够正确连接到新的音频位置
-    DispatchQueue.main.async {
-        print("[MusicPlayer] 在seek后立即重新设置FFT分析器")
-        self.setupFFTAnalysis() // 完全重新设置FFT分析器
-    }
+        // 这样在暂停状态下拖动进度条后再播放时，FFT分析器能够正确连接到新的音频位置
+        DispatchQueue.main.async {
+            print("[MusicPlayer] 在seek后立即重新设置FFT分析器")
+            self.setupFFTAnalysis() // 完全重新设置FFT分析器
+        }
     }
     
     // 停止播放
