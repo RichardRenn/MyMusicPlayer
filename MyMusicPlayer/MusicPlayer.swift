@@ -538,8 +538,14 @@ class MusicPlayer: NSObject, ObservableObject {
             // 开始进度更新计时器
             self.startProgressTimer()
             
-            // 重新启动FFT分析
-            self.fftTap?.start()
+            // 重新设置并启动FFT分析器
+            if self.isSpectrumAnalysisEnabled {
+                print("[MusicPlayer] 恢复播放时重新设置FFT分析器")
+                self.setupFFTAnalysis()
+            } else {
+                // 如果频谱分析未启用，至少尝试启动现有的FFT分析器
+                self.fftTap?.start()
+            }
             
             // 发送播放状态变化通知
             NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
