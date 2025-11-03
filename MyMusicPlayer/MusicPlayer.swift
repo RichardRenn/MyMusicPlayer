@@ -420,7 +420,7 @@ class MusicPlayer: NSObject, ObservableObject {
     
     // 更新控制中心显示信息
     func updateNowPlayingInfo() {
-        // 先检查是否有正在播放的音乐
+        // 检查是否有正在播放的音乐
         guard let currentMusic = currentMusic else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
@@ -435,11 +435,30 @@ class MusicPlayer: NSObject, ObservableObject {
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0
         ]
         
-        // 直接设置Now Playing信息
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        // 确保在主线程更新控制中心信息
+        DispatchQueue.main.async {
+            // 复制变量到闭包内部，避免作用域问题
+            let localInfo = info
+            
+            // 直接更新Now Playing信息，不清除旧信息，避免闪烁
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = localInfo
+            
+            // 验证设置后的信息，如有失败则重试
+            if MPNowPlayingInfoCenter.default().nowPlayingInfo == nil {
+                // 重试一次，这次先清除再设置
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        MPNowPlayingInfoCenter.default().nowPlayingInfo = localInfo
+                    }
+                }
+            }
+        }
         
-        // 简化的诊断日志
-//        print("🔊 [MusicPlayer] Now Playing信息已更新: 标题='\(info[MPMediaItemPropertyTitle]!)', 艺术家='\(info[MPMediaItemPropertyArtist]!)'")
+        // 确保远程控制命令中心的状态与当前播放器状态一致
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.isEnabled = !isPlaying
+        commandCenter.pauseCommand.isEnabled = isPlaying
     }
     
     // 清理安全范围资源的访问权限
@@ -461,49 +480,68 @@ class MusicPlayer: NSObject, ObservableObject {
     
     // 暂停播放
     func pause() {
-        player.pause() // 使用pause()而不是stop()来保留播放位置
-        isPlaying = false
-        stopProgressTimer()
-        
-        // 停止FFT分析，避免暂停后波形图仍在动
-        fftTap?.stop()
-        print("[MusicPlayer] 已停止FFT分析")
-        
-        // 在主线程上更新Now Playing信息和发送状态改变通知
-        DispatchQueue.main.async { [weak self] in
-            self?.updateNowPlayingInfo()
-            print("[MusicPlayer] 已暂停播放并更新Now Playing信息")
+        // 确保在主线程执行
+        DispatchQueue.main.async {
+            // 重置上次更新时间
+            self.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
+            // 确保音频会话激活
+            self.becomeActiveMediaPlayer()
             
-            // 发送播放器状态改变通知，确保UI组件能响应状态变化
+            // 暂停播放
+            self.player.pause()
+            self.isPlaying = false
+            
+            // 立即更新Now Playing信息
+            self.updateNowPlayingInfo()
+            
+            // 0.5秒后再次更新，确保状态正确同步
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // 使用weak self避免循环引用
+                [weak self] in
+                self?.updateNowPlayingInfo()
+            }
+            
+            // 停止进度更新计时器
+            self.stopProgressTimer()
+            
+            // 停止FFT分析，避免暂停后波形图仍在动
+            self.fftTap?.stop()
+            
+            // 发送播放状态变化通知
             NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
         }
     }
     
     // 恢复播放
     func resume() {
-        // 确保音频会话处于活动状态
-        becomeActiveMediaPlayer()
-        
-        player.play() // 只使用AudioKit播放器恢复播放
-        isPlaying = true
-        startProgressTimer()
-        
-        // 重新启动FFT分析
-        fftTap?.start()
-        print("[MusicPlayer] 已重新启动FFT分析")
-        
-        // 在主线程上更新Now Playing信息和发送状态改变通知
-        DispatchQueue.main.async { [weak self] in
-            self?.updateNowPlayingInfo()
+        // 确保在主线程执行
+        DispatchQueue.main.async {
+            // 重置上次更新时间
+            self.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
+            // 确保音频会话激活
+            self.becomeActiveMediaPlayer()
             
-            // 添加延迟再次更新，确保信息正确显示
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { 
+            // 开始播放
+            self.player.play()
+            self.isPlaying = true
+            
+            // 立即更新Now Playing信息
+            self.updateNowPlayingInfo()
+            
+            // 0.5秒后再次更新，确保状态正确同步
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // 使用weak self避免循环引用
+                [weak self] in
                 self?.updateNowPlayingInfo()
             }
             
-            print("[MusicPlayer] 已恢复播放并更新Now Playing信息")
+            // 开始进度更新计时器
+            self.startProgressTimer()
             
-            // 发送播放器状态改变通知，确保UI组件能响应状态变化
+            // 重新启动FFT分析
+            self.fftTap?.start()
+            
+            // 发送播放状态变化通知
             NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
         }
     }
