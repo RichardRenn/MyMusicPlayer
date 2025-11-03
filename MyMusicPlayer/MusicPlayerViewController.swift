@@ -793,17 +793,11 @@ class WaveformView: UIView {
         .systemPink.withAlphaComponent(0.95)
     ]
     
-    // 上半部分波形条数组
+    // 上半部分波形条数组（只显示上半部分波形）
     private var topBars: [UIView] = []
-    
-    // 下半部分波形条数组
-    private var bottomBars: [UIView] = []
     
     // 上半部分渐变层数组
     private var topGradientLayers: [CAGradientLayer] = []
-    
-    // 下半部分渐变层数组
-    private var bottomGradientLayers: [CAGradientLayer] = []
     
     // 动画计时器
     private var animationTimer: Timer?
@@ -835,14 +829,10 @@ class WaveformView: UIView {
     private func setupWaveform() {
         // 清空现有的波形条和渐变层
         topBars.forEach { $0.removeFromSuperview() }
-        bottomBars.forEach { $0.removeFromSuperview() }
         topGradientLayers.forEach { $0.removeFromSuperlayer() }
-        bottomGradientLayers.forEach { $0.removeFromSuperlayer() }
         
         topBars.removeAll()
-        bottomBars.removeAll()
         topGradientLayers.removeAll()
-        bottomGradientLayers.removeAll()
         baseHeights.removeAll()
         
         // 计算可用宽度并调整间距
@@ -855,10 +845,10 @@ class WaveformView: UIView {
             effectiveSpacing = max(1.0, (availableWidth - totalBarWidth) / CGFloat(barCount - 1))
         }
         
-        // 计算最大波形高度（视图高度的一半的98%，接近最大值）
-        maxBarHeight = bounds.height / 2 * 2.0
+        // 计算最大波形高度（整个视图高度，因为只显示上半部分）
+        maxBarHeight = bounds.height * 0.95
         
-        // 创建波形条（上下对称）
+        // 创建波形条（只创建上半部分）
         for i in 0..<barCount {
             // 为真实频谱数据设计的基础高度（不再使用随机值）
             // 基于频率分布的对数特性，低频部分可以有更高的基础高度
@@ -887,92 +877,36 @@ class WaveformView: UIView {
             topBar.layer.insertSublayer(topGradientLayer, at: 0)
             topGradientLayers.append(topGradientLayer)
             
-            // 创建下半部分波形条 - 只保留底部圆角
-            let bottomBar = UIView()
-            bottomBar.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-            bottomBar.layer.cornerRadius = barWidth / 2
-            bottomBar.clipsToBounds = true
-            bottomBar.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(bottomBar)
-            bottomBars.append(bottomBar)
-            
-            // 为下半部分添加渐变层
-            let bottomGradientLayer = CAGradientLayer()
-            bottomGradientLayer.colors = gradientColors.map { $0.cgColor }
-            bottomGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
-            bottomGradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
-            bottomGradientLayer.frame = bottomBar.bounds
-            bottomBar.layer.insertSublayer(bottomGradientLayer, at: 0)
-            bottomGradientLayers.append(bottomGradientLayer)
-            
-            // 设置上半部分约束
+            // 设置上半部分约束 - 从底部向上延伸
             NSLayoutConstraint.activate([
                 topBar.widthAnchor.constraint(equalToConstant: barWidth),
-                topBar.bottomAnchor.constraint(equalTo: centerYAnchor), // 从中间向上延伸（修改为bottomAnchor确保与中心线对齐）
+                topBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5), // 从底部向上延伸，留出一点边距
                 topBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
             ])
             
-            // 设置下半部分约束
-            NSLayoutConstraint.activate([
-                bottomBar.widthAnchor.constraint(equalToConstant: barWidth),
-                bottomBar.topAnchor.constraint(equalTo: centerYAnchor), // 从中间向下延伸（修改为topAnchor确保与中心线对齐）
-                bottomBar.heightAnchor.constraint(equalToConstant: baseHeights[i])
-            ])
-            
-            // 设置水平位置（上下条水平对齐，确保整体水平居中）
+            // 设置水平位置，确保整体水平居中
             let totalWidth = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * effectiveSpacing
             let startOffset = (bounds.width - totalWidth) / 2
             let xOffset = startOffset + CGFloat(i) * (barWidth + effectiveSpacing)
-            
-            // 更严格地移除旧的水平约束
-            // 方法1：获取所有与当前视图相关的约束
-            let topBarConstraintsToRemove = topBar.constraints.filter { constraint in
-                if constraint.firstAttribute == .leading && constraint.firstItem as? UIView == topBar {
-                    return true
-                }
-                // 检查是否是我们视图作为secondItem的约束
-                if let secondItem = constraint.secondItem as? UIView, secondItem == self {
-                    return true
-                }
-                return false
-            }
-            
-            let bottomBarConstraintsToRemove = bottomBar.constraints.filter { constraint in
-                if constraint.firstAttribute == .leading && constraint.firstItem as? UIView == bottomBar {
-                    return true
-                }
-                // 检查是否是我们视图作为secondItem的约束
-                if let secondItem = constraint.secondItem as? UIView, secondItem == self {
-                    return true
-                }
-                return false
-            }
             
             // 方法2：获取superview中与这些视图相关的约束
             if let superview = topBar.superview {
                 let superviewConstraintsToRemove = superview.constraints.filter { constraint in
                     let involvesTopBar = (constraint.firstItem as? UIView == topBar || constraint.secondItem as? UIView == topBar)
-                    let involvesBottomBar = (constraint.firstItem as? UIView == bottomBar || constraint.secondItem as? UIView == bottomBar)
                     let isLeadingConstraint = (constraint.firstAttribute == .leading || constraint.secondAttribute == .leading)
-                    return (involvesTopBar || involvesBottomBar) && isLeadingConstraint
+                    return involvesTopBar && isLeadingConstraint
                 }
                 NSLayoutConstraint.deactivate(superviewConstraintsToRemove)
             }
             
-            // 停用找到的约束
-            NSLayoutConstraint.deactivate(topBarConstraintsToRemove)
-            NSLayoutConstraint.deactivate(bottomBarConstraintsToRemove)
-            
             // 创建并激活新的水平位置约束
             let topLeadingConstraint = topBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset)
-            let bottomLeadingConstraint = bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset)
             
             // 设置高优先级
-            topLeadingConstraint.priority = .required
-            bottomLeadingConstraint.priority = .required
+            topLeadingConstraint.priority = UILayoutPriority.required
             
             // 激活约束
-            NSLayoutConstraint.activate([topLeadingConstraint, bottomLeadingConstraint])
+            NSLayoutConstraint.activate([topLeadingConstraint])
         }
         
         // print("[WaveformView] 波形图设置完成，创建了\(barCount * 2)个波形条（上下各\(barCount)个）")
@@ -991,10 +925,9 @@ class WaveformView: UIView {
         
         // 重置波形条高度 - 直接设置，不使用动画
         DispatchQueue.main.async {
-            for (index, (topBar, bottomBar)) in zip(self.topBars, self.bottomBars).enumerated() {
+            for (index, topBar) in self.topBars.enumerated() {
                 // 移除旧的高度约束
                 NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
-                NSLayoutConstraint.deactivate(bottomBar.constraints.filter { $0.firstAttribute == .height })
                 
                 // 设置静态状态下的高度（稍微缩小的基础高度）
                 let staticHeight = max(0.0, self.baseHeights[index] * 0.9)
@@ -1002,10 +935,6 @@ class WaveformView: UIView {
                 // 更新上半部分约束
                 let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: staticHeight)
                 topHeightConstraint.isActive = true
-                
-                // 更新下半部分约束
-                let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: staticHeight)
-                bottomHeightConstraint.isActive = true
             }
             
             // 强制布局更新
@@ -1068,8 +997,8 @@ class WaveformView: UIView {
         // 存储当前数据用于下次平滑
         previousFFTData = smoothData
         
-        // 更新每个波形条
-        for (index, ((topBar, bottomBar), (topGradient, bottomGradient))) in zip(zip(topBars, bottomBars), zip(topGradientLayers, bottomGradientLayers)).enumerated() {
+        // 更新每个波形条（只更新上半部分）
+        for (index, (topBar, topGradient)) in zip(topBars, topGradientLayers).enumerated() {
             // 实现镜像对称效果：高音在中间，低音在两边
             // 改进的镜像逻辑 - 避免中间出现空白
             let centerPosition = CGFloat(barCount) / 2.0
@@ -1112,11 +1041,10 @@ class WaveformView: UIView {
             let targetHeight = baseHeights[index] + dynamicHeight
             
             // 更新波形条高度
-            updateBarHeights(topBar: topBar, bottomBar: bottomBar, height: targetHeight)
+            updateBarHeight(topBar: topBar, height: targetHeight)
             
             // 更新渐变层frame
             topGradient.frame = topBar.bounds
-            bottomGradient.frame = bottomBar.bounds
         }
         
         // 使用动画使波形变化更平滑
@@ -1133,13 +1061,12 @@ class WaveformView: UIView {
         // 更新每个波形条的约束
         updateBarConstraints()
         
-        // 更新最大波形高度
-        maxBarHeight = bounds.height / 2 * 1.5
+        // 更新最大波形高度（整个视图高度，因为只显示上半部分）
+        maxBarHeight = bounds.height * 0.95
         
         // 更新渐变层frame
-        for ((topBar, bottomBar), (topGradient, bottomGradient)) in zip(zip(topBars, bottomBars), zip(topGradientLayers, bottomGradientLayers)) {
+        for (topBar, topGradient) in zip(topBars, topGradientLayers) {
             topGradient.frame = topBar.bounds
-            bottomGradient.frame = bottomBar.bounds
         }
     }
     
@@ -1148,14 +1075,13 @@ class WaveformView: UIView {
         // 清除之前的FFT数据缓存
         previousFFTData = nil
         
-        for (index, ((topBar, bottomBar), (topGradient, bottomGradient))) in zip(zip(topBars, bottomBars), zip(topGradientLayers, bottomGradientLayers)).enumerated() {
+        for (index, (topBar, topGradient)) in zip(topBars, topGradientLayers).enumerated() {
             // 使用静止状态的高度（更小，更稳定）
             let staticHeight = max(0.0, baseHeights[index] * 0.5)
-            updateBarHeights(topBar: topBar, bottomBar: bottomBar, height: staticHeight)
+            updateBarHeight(topBar: topBar, height: staticHeight)
             
             // 更新渐变层frame
             topGradient.frame = topBar.bounds
-            bottomGradient.frame = bottomBar.bounds
         }
         
         // 使用动画平滑过渡到静止状态
@@ -1166,25 +1092,20 @@ class WaveformView: UIView {
     }
     
     // 更新单个波形条的高度
-    private func updateBarHeights(topBar: UIView, bottomBar: UIView, height: CGFloat) {
+    private func updateBarHeight(topBar: UIView, height: CGFloat) {
         // 移除旧的高度约束
         NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .height })
-        NSLayoutConstraint.deactivate(bottomBar.constraints.filter { $0.firstAttribute == .height })
         
-        // 添加新的高度约束（上下对称）
+        // 添加新的高度约束
         let topHeightConstraint = topBar.heightAnchor.constraint(equalToConstant: height)
         topHeightConstraint.priority = .required
         topHeightConstraint.isActive = true
-        
-        let bottomHeightConstraint = bottomBar.heightAnchor.constraint(equalToConstant: height)
-        bottomHeightConstraint.priority = .required
-        bottomHeightConstraint.isActive = true
     }
     
     // 更新单个波形条的约束
     private func updateBarConstraints() {
         // 确保波形条已经创建
-        guard !topBars.isEmpty && topBars.count == bottomBars.count else {
+        guard !topBars.isEmpty else {
             return
         }
         
@@ -1209,35 +1130,29 @@ class WaveformView: UIView {
                 let affectsTopBars = topBars.contains { bar in
                     constraint.firstItem as? UIView == bar || constraint.secondItem as? UIView == bar
                 }
-                let affectsBottomBars = bottomBars.contains { bar in
-                    constraint.firstItem as? UIView == bar || constraint.secondItem as? UIView == bar
-                }
                 let isHorizontalConstraint = constraint.firstAttribute == .leading || constraint.firstAttribute == .trailing
-                return (affectsTopBars || affectsBottomBars) && isHorizontalConstraint
+                return affectsTopBars && isHorizontalConstraint
             }
             // 停用所有找到的水平约束
             NSLayoutConstraint.deactivate(horizontalConstraints)
         }
         
         // 重新设置每个波形条的水平位置约束
-        for (index, (topBar, bottomBar)) in zip(topBars, bottomBars).enumerated() {
+        for (index, topBar) in topBars.enumerated() {
             // 计算正确的X偏移量（与setupWaveform方法保持一致）
             let xOffset = startOffset + CGFloat(index) * (barWidth + effectiveSpacing)
             
             // 确保移除所有可能的旧约束
             NSLayoutConstraint.deactivate(topBar.constraints.filter { $0.firstAttribute == .leading })
-            NSLayoutConstraint.deactivate(bottomBar.constraints.filter { $0.firstAttribute == .leading })
             
             // 创建并激活新的水平位置约束
             let topLeadingConstraint = topBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset)
-            let bottomLeadingConstraint = bottomBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: xOffset)
             
             // 设置高优先级
             topLeadingConstraint.priority = .required
-            bottomLeadingConstraint.priority = .required
             
             // 激活约束
-            NSLayoutConstraint.activate([topLeadingConstraint, bottomLeadingConstraint])
+            NSLayoutConstraint.activate([topLeadingConstraint])
         }
         
     }
