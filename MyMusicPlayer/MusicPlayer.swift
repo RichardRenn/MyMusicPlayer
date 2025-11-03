@@ -150,20 +150,26 @@ class MusicPlayer: NSObject, ObservableObject {
                 
                 // 只有在频谱分析已启用、有效数据足够多且播放状态为true时才处理和传递数据
                 if isSpectrumAnalysisEnabled && validFFTData.count > Int(Double(fftData.count) * 0.8) { // 至少80%的数据有效
-                    // 添加调试信息，检查FFT数据
-                    let maxValue = validFFTData.max() ?? 0
-                    let avgValue = validFFTData.reduce(0, +) / Float(validFFTData.count)
-                    print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
+                    // 限制FFT数据处理和回调频率为每秒1次，降低CPU占用
+                    let currentTime = Date().timeIntervalSince1970
+                    // 重要！！ 调整为刷新频率，提高视觉流畅度同时保持较低CPU占用
+                    if currentTime - self.lastFFTLogTime > 0.06 {
+                        // 添加调试信息，检查FFT数据
+                        let maxValue = validFFTData.max() ?? 0
+                        let avgValue = validFFTData.reduce(0, +) / Float(validFFTData.count)
+                        // print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
+                        self.lastFFTLogTime = currentTime
                     
-                    // 通过回调传递频谱数据
-                    if let callback = self.spectrumDataCallback {
-                        DispatchQueue.main.async {
-                            callback(validFFTData)
+                        // 通过回调传递频谱数据
+                        if let callback = self.spectrumDataCallback {
+                            DispatchQueue.main.async {
+                                callback(validFFTData)
+                            }
                         }
                     }
                 } else if !self.isPlaying {
                     // 在暂停状态下，如果数据质量差，减少日志输出频率
-                    if Date().timeIntervalSince1970 - self.lastFFTLogTime > 1.0 {
+                    if Date().timeIntervalSince1970 - self.lastFFTLogTime > 2.0 {
                         print("[MusicPlayer] 暂停状态下FFT数据质量差，跳过处理 - 有效数据: \(validFFTData.count)/\(fftData.count)")
                         self.lastFFTLogTime = Date().timeIntervalSince1970
                     }

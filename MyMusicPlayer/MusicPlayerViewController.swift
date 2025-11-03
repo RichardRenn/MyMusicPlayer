@@ -1033,8 +1033,8 @@ class WaveformView: UIView {
                 topGradient.frame = topBar.bounds
             }
             
-            // 执行动画
-            UIView.animate(withDuration: 0.05, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            // 重要！！ 执行动画 控制柱状图缓缓消失的动画的流畅度，数值越大越平滑，当小于0.05时会有很大的顿挫感
+            UIView.animate(withDuration: 0.1, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
                 self.layoutIfNeeded()
             }
         }
