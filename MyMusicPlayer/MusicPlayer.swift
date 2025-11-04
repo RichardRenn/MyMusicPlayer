@@ -423,14 +423,34 @@ class MusicPlayer: NSObject, ObservableObject {
             return
         }
         
-        // 创建基本的Now Playing信息字典（只包含必需字段）
-        let info: [String: Any] = [
+        // 创建完整的Now Playing信息字典，包含更多详细信息
+        var info: [String: Any] = [
+            // 基本信息
             MPMediaItemPropertyTitle: currentMusic.title.isEmpty ? "未知标题" : currentMusic.title,
             MPMediaItemPropertyArtist: currentMusic.artist.isEmpty ? "未知艺术家" : currentMusic.artist,
+            MPMediaItemPropertyAlbumTitle: currentMusic.album.isEmpty ? "未知专辑" : currentMusic.album,
+            
+            // 播放状态信息
             MPMediaItemPropertyPlaybackDuration: player.duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: player.currentTime,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            
+            // 播放列表信息
+            MPNowPlayingInfoPropertyIsLiveStream: false,
         ]
+        
+        // 添加播放列表位置信息
+        let totalTracks = isRangeLocked ? currentDirectoryPlaylist.count : fullPlaylist.count
+        if totalTracks > 0 && currentIndex >= 0 {
+            info[MPMediaItemPropertyPersistentID] = currentIndex + 1
+            info[MPMediaItemPropertyAlbumTrackNumber] = currentIndex + 1
+            info[MPMediaItemPropertyAlbumTrackCount] = totalTracks
+        }
+        
+        // 可以根据需要添加更多信息，如：
+        // - 音频格式信息
+        // - 歌词可用性信息
+        // - 自定义信息
         
         // 确保在主线程更新控制中心信息
         DispatchQueue.main.async {
