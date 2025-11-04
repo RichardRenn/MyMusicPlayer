@@ -402,9 +402,9 @@ class MusicPlayer: NSObject, ObservableObject {
         currentTime = player.currentTime
 
         
-        // 降低Now Playing信息更新频率，每3秒更新一次
+        // 提高Now Playing信息更新频率，每1秒更新一次，确保控制中心进度条流畅更新
         let currentTime = Date().timeIntervalSince1970
-        if currentTime - lastNowPlayingUpdateTime >= 3.0 {
+        if currentTime - lastNowPlayingUpdateTime >= 1.0 {
             updateNowPlayingInfo()
             lastNowPlayingUpdateTime = currentTime
         }

@@ -198,12 +198,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     }()
     
     // 保留原来的进度视图作为背景指示器（可选，默认隐藏）
-    private let progressView: UIProgressView = {
-        let progressView = UIProgressView()
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        progressView.isHidden = true // 隐藏，因为我们将使用滑块
-        return progressView
-    }()
+
     
     private let timeLabel: UILabel = {
         let label = UILabel()
@@ -268,8 +263,26 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 处理从歌词详情页返回的通知
     @objc private func handleMusicPlayerReturn() {
         // 如果歌词是展开状态，则立即刷新位置
-        if isLyricsExpanded {
-            updateLyricDisplay()
+        if isLyricsExpanded && !lyrics.isEmpty {
+            // 强制获取最新的歌词索引并更新，不受当前索引是否变化的影响
+            let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
+            let safeIndex = min(max(newIndex, 0), lyrics.count - 1)
+            
+            // 直接更新currentLyricIndex
+            currentLyricIndex = safeIndex
+            
+            // 在主线程立即更新UI
+            DispatchQueue.main.async {
+                // 再次确认索引在有效范围内
+                let finalIndex = min(max(safeIndex, 0), self.lyrics.count - 1)
+                
+                // 只有当索引有效时才滚动
+                if finalIndex >= 0 && finalIndex < self.lyrics.count {
+                    let indexPath = IndexPath(row: finalIndex, section: 0)
+                    self.lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
+                    self.lyricsTableView.reloadData() // 刷新表格以更新高亮状态
+                }
+            }
         }
     }
     
@@ -332,6 +345,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         saveMusicList()
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 从详情页返回时，如果歌词面板是展开的，立即更新歌词高亮位置
+        if isLyricsExpanded {
+            updateLyricDisplay()
+            print("[MusicListViewController] viewWillAppear - 立即更新歌词高亮位置")
+        }
+    }
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 当视图布局更新时重新设置梯形形状
@@ -382,7 +404,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.addSubview(bottomBanner)
         view.bringSubviewToFront(expandButton) // 确保展开按钮在横幅上方
         bottomBanner.addSubview(songTitleLabel) // 添加歌曲标题标签
-        bottomBanner.addSubview(progressView) // 保留但隐藏
+
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
         bottomBanner.addSubview(totalTimeLabel)
@@ -419,7 +441,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             expandButton.widthAnchor.constraint(equalToConstant: 80),
             expandButton.heightAnchor.constraint(equalToConstant: 20),
-            expandButton.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 20), // 调整位置
+            expandButton.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 4), // 调整位置
             
             // 歌词面板 - 包在容器中 撑满容器
             lyricsPanel.leadingAnchor.constraint(equalTo: lyricsContainer.leadingAnchor),
@@ -439,26 +461,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             lyricsTableView.trailingAnchor.constraint(equalTo: lyricsPanel.trailingAnchor),
             lyricsTableView.bottomAnchor.constraint(equalTo: lyricsPanel.bottomAnchor),
             
-            // 底部横幅 - 设置为悬浮样式，两侧留出空隙
-            bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            // 底部横幅 - 修改为与列表页一致的布局
+            bottomBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), // 添加左侧边距
+            bottomBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16), // 添加右侧边距
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
-            bottomBanner.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.14), // 屏幕高度的14%
+            bottomBanner.heightAnchor.constraint(greaterThanOrEqualToConstant: 120), // 确保足够的高度来容纳所有元素
             
             // 歌曲标题 - 靠左显示，相对于进度条上方
             songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8), // 进度条上方8像素
             
-            // 进度条（隐藏）- 相对于按钮组上方定位
-            progressView.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
-            progressView.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressView.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
-            
-            // 进度滑块 - 相对于按钮组上方定位
+            // 进度滑块 - 居中定位，作为布局中心点
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressSlider.bottomAnchor.constraint(equalTo: allButtonsStack.topAnchor, constant: -8), // 按钮组上方8像素
+            progressSlider.centerYAnchor.constraint(equalTo: bottomBanner.centerYAnchor), // 进度滑块居中
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -467,9 +484,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             totalTimeLabel.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
             totalTimeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 4), // 固定4像素顶部边距
 
-            // 合并的按钮组 - 居中显示
+            // 合并的按钮组 - 相对于进度滑块下方定位
             allButtonsStack.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            allButtonsStack.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor, constant: -8), // 固定8像素底部边距
+            allButtonsStack.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 8), // 进度滑块下方8像素
             allButtonsStack.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
             
             // 按钮大小约束 - 使用底部横幅高度的百分比（降低乘数以避免约束冲突）
@@ -537,7 +554,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: NSNotification.Name("PlayerStateChanged"), object: nil)
         
         // 初始化进度条和时间标签
-        progressView.progress = 0
+
         
         // 初始化进度滑块
         progressSlider.value = 0
@@ -1149,7 +1166,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             if !isSeeking {
                 // 更新进度条和滑块
                 let progress = Float(musicPlayer.currentTime / musicPlayer.totalTime)
-                progressView.progress = progress
+        
                 progressSlider.value = progress
 
                 // 更新时间标签
@@ -1241,8 +1258,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         musicPlayer.seek(to: seekTime)
         
         // 立即更新UI并恢复计时器
-        progressView.progress = slider.value
         timeLabel.text = formatTime(seekTime)
+        startUpdateTimer()
         
         // 发送通知，通知播放页更新滑块位置
         NotificationCenter.default.post(name: .musicPlayerProgressChanged, object: nil, userInfo: ["currentTime": seekTime, "totalTime": musicPlayer.totalTime])
@@ -1585,7 +1602,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 只有当用户不在拖动滑块时才更新UI
         if !isSeeking {
             let progress = musicPlayer.currentTime / musicPlayer.totalTime
-            progressView.progress = Float(progress)
+    
             progressSlider.value = Float(progress) // 同时更新滑块位置
             
             // 更新时间标签
@@ -1599,19 +1616,34 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 参照MusicPlayerViewController实现歌词更新显示方法
     private func updateLyricDisplay() {
+        // 添加额外的空数组检查
         guard !lyrics.isEmpty else { return }
         
         let newIndex = LyricsParser.getCurrentLyricIndex(time: musicPlayer.currentTime, lyrics: lyrics)
         
-        if newIndex != currentLyricIndex {
-            // 确保索引在有效范围内
-            currentLyricIndex = min(max(newIndex, 0), lyrics.count - 1)
+        // 严格确保索引在有效范围内，防止任何可能的越界
+        let safeIndex = min(max(newIndex, 0), lyrics.count - 1)
+        
+        if safeIndex != currentLyricIndex {
+            currentLyricIndex = safeIndex
             
             // 如果歌词面板是展开的，更新UI
             if isLyricsExpanded {
-                // 滚动到当前歌词行，使其居中显示
-                lyricsTableView.scrollToRow(at: IndexPath(row: currentLyricIndex, section: 0), at: .middle, animated: true)
-                lyricsTableView.reloadData() // 刷新表格以更新高亮状态
+                // 在滚动前再次检查歌词数组是否为空，确保安全
+                if !lyrics.isEmpty {
+                    // 使用主线程确保UI操作安全
+                    DispatchQueue.main.async {
+                        // 再次确认索引在有效范围内
+                        let finalIndex = min(max(safeIndex, 0), self.lyrics.count - 1)
+                        
+                        // 只有当索引有效时才滚动
+                        if finalIndex >= 0 && finalIndex < self.lyrics.count {
+                            let indexPath = IndexPath(row: finalIndex, section: 0)
+                            self.lyricsTableView.scrollToRow(at: indexPath, at: .middle, animated: true)
+                            self.lyricsTableView.reloadData() // 刷新表格以更新高亮状态
+                        }
+                    }
+                }
             }
         }
     }
