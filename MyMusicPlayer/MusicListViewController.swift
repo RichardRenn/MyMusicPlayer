@@ -1396,15 +1396,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             var content = cell.defaultContentConfiguration()
             content.text = directory.name
             content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
-            
-            // 根据showFolderIcons控制是否显示文件夹图标
-            if showFolderIcons {
-                let iconName = directory.isExpanded ? "folder.fill" : "folder"
-                content.image = UIImage(systemName: iconName)
-                content.imageProperties.tintColor = .tintColor
-            } else {
-                content.image = nil // 不显示图标
-            }
+            content.image = nil
             
             // 根据不同层级设置递增的缩进宽度
             // 基础缩进8像素，每层额外增加26像素
@@ -1436,28 +1428,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             }
             
             // 如果是当前播放的歌曲，高亮显示
-                if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {
-                    content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
-                    content.textProperties.color = .tintColor
-                } else {
-                content.textProperties.font = UIFont.systemFont(ofSize: 16)
-                content.textProperties.color = .label
-            }
-            
-            
-            // 根据showFolderIcons控制是否显示音乐图标
-            if showFolderIcons {
-                // 根据播放状态显示不同的音乐图标
-                if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url && musicPlayer.isPlaying {
-                    content.image = UIImage(systemName: "play.fill") // 播放中的歌曲显示实心图标
-                } else {
-                    content.image = UIImage(systemName: "play") // 非播放中的歌曲显示空心图标
-                }
-                // content.image = UIImage(systemName: "music.note")
-                content.imageProperties.tintColor = .tintColor
+            if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {
+                content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
+                content.textProperties.color = .tintColor
             } else {
-                content.image = nil // 不显示图标
+            content.textProperties.font = UIFont.systemFont(ofSize: 16)
+            content.textProperties.color = .label
             }
+            
+            content.image = nil
 
             // 基础缩进8像素，每层额外增加26像素
             cell.indentationLevel = 1 // 固定为1级
