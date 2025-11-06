@@ -949,58 +949,24 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let imageName = isLyricsExpanded ? "chevron.down" : "chevron.up"
         expandButton.setImage(UIImage(systemName: imageName), for: .normal)
 
-        view.layoutIfNeeded()
-        lyricsPanel.clipsToBounds = false
-
         if isLyricsExpanded {
             lyricsContainer.isHidden = false
             lyricsPanel.isHidden = false
-            lyricsPanel.alpha = 0.0
-            // ✅ 用底部为基点的变换：先平移一半高度再scale
-            lyricsPanel.transform = CGAffineTransform(translationX: 0, y: lyricsPanel.bounds.height / 2)
-                .scaledBy(x: 1.0, y: 0.001)
-
-            UIView.animate(withDuration: 0.35,
-                        delay: 0,
-                        usingSpringWithDamping: 0.85,
-                        initialSpringVelocity: 0.5,
-                        options: [.allowUserInteraction],
-                        animations: {
-                self.lyricsPanel.alpha = 1.0
-                self.lyricsPanel.transform = .identity
-                // self.lyricsPanel.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
-                // self.lyricsPanel.layer.shadowOffset = CGSize(width: 0, height: -2) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
-                // self.lyricsPanel.layer.shadowOpacity = 0.2 // 阴影不透明度为 0.1（很淡的阴影）
-                // self.lyricsPanel.layer.shadowRadius = 1 // 阴影的模糊半径
-                // self.lyricsPanel.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
-                self.bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-                self.bottomBanner.layoutIfNeeded()
-        
-            }, completion: { _ in
-                self.loadLyricsIfNeeded()
-            })
-
+            lyricsPanel.alpha = 1.0
+            lyricsPanel.transform = .identity
+            bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            view.layoutIfNeeded()
+            loadLyricsIfNeeded()
         } else {
-            UIView.animate(withDuration: 0.3,
-                        delay: 0,
-                        options: [.curveEaseIn, .allowUserInteraction],
-                        animations: {
-                // ✅ 从底部往下收起
-                self.lyricsPanel.alpha = 0.0
-                self.lyricsPanel.transform = CGAffineTransform(translationX: 0, y: self.lyricsPanel.bounds.height / 2)
-                    .scaledBy(x: 1.0, y: 0.001)
-                self.bottomBanner.layer.maskedCorners = [
-                    .layerMinXMinYCorner, .layerMaxXMinYCorner,
-                    .layerMinXMaxYCorner, .layerMaxXMaxYCorner
-                ]
-                self.bottomBanner.layoutIfNeeded()
-        
-            }, completion: { _ in
-                self.lyricsContainer.isHidden = true
-                self.lyricsPanel.isHidden = true
-                self.lyricsPanel.alpha = 1.0
-                self.lyricsPanel.transform = .identity
-            })
+            lyricsPanel.alpha = 1.0
+            lyricsPanel.transform = .identity
+            bottomBanner.layer.maskedCorners = [
+                .layerMinXMinYCorner, .layerMaxXMinYCorner,
+                .layerMinXMaxYCorner, .layerMaxXMaxYCorner
+            ]
+            view.layoutIfNeeded()
+            lyricsContainer.isHidden = true
+            lyricsPanel.isHidden = true
         }
     }
 
