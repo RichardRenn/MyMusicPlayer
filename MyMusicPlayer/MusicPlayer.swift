@@ -142,7 +142,7 @@ class MusicPlayer: NSObject, ObservableObject {
             print("[MusicPlayer] 频谱分析已启用，创建FFT分析器")
             
             // 创建FFT分析器，使用固定的bufferSize以获得更稳定的频谱数据
-            fftTap = FFTTap(player, bufferSize: 1024) { [weak self] fftData in
+            fftTap = FFTTap(player, bufferSize: 2048) { [weak self] fftData in
                 guard let self = self else { return }
                 
                 // 过滤掉NaN和无效值，只保留有效的FFT数据

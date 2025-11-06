@@ -44,14 +44,21 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         return view
     }()
     
-    // 保留歌曲标题标签但默认隐藏
+    // 创建一个透明的容器视图来扩大可点击区域
+    private let songTitleContainer: UIButton = {
+        let button = UIButton(type: .custom)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.backgroundColor = .clear
+        return button
+    }()
+    
     private let songTitleLabel: UILabel = {
         let label = UILabel()
         label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
         label.textAlignment = .left
-        label.isHidden = true
+        // 初始状态将根据showFolderIcons设置决定，在viewWillAppear中通过updateWaveformVisibility方法更新
         return label
     }()
     
@@ -234,6 +241,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
         waveformView.isHidden = !showWaveform
         
+        // 根据眼镜开关状态更新歌曲标题标签的显示状态
+        songTitleLabel.isHidden = showWaveform
+        
         // 根据波形图显示状态控制频谱分析计算
         if !showWaveform {
             // 如果波形图隐藏，禁用频谱分析计算并停止动画
@@ -258,6 +268,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 移除通知监听
         NotificationCenter.default.removeObserver(self, name: NSNotification.Name("PlayerStateChanged"), object: nil)
         NotificationCenter.default.removeObserver(self, name: .musicPlayerProgressChanged, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
     }
     
     // 设置UI
@@ -283,7 +294,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 添加底部横幅
         view.addSubview(bottomBanner)
         bottomBanner.addSubview(waveformView) // 添加波形图视图
-        bottomBanner.addSubview(songTitleLabel) // 保留歌曲标题标签但默认隐藏
+        bottomBanner.addSubview(songTitleContainer) // 添加歌曲标题容器
+        songTitleContainer.addSubview(songTitleLabel) // 保留歌曲标题标签但默认隐藏
 
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
@@ -325,19 +337,25 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             
             // 波形图 - 相对于进度条上方定位
             waveformView.centerXAnchor.constraint(equalTo: bottomBanner.centerXAnchor),
-            waveformView.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -4),
             waveformView.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 8),
+            waveformView.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -4), // 进度条上方4像素
             waveformView.widthAnchor.constraint(equalTo: bottomBanner.widthAnchor, constant: -32), // 与进度条宽度一致，左右各留16像素边距
             
-            // 歌曲标题 - 靠左显示，相对于进度条上方（默认隐藏）
-            songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
-            songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32),
-            songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8),
+            // 歌曲标题容器 - 设置更大的可点击区域
+            songTitleContainer.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
+            songTitleContainer.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32),
+            songTitleContainer.topAnchor.constraint(equalTo: bottomBanner.topAnchor), // 顶部与横幅顶部齐平
+            songTitleContainer.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -6), // 进度条上方6像素
+            // 歌曲标题 - 调整为底部对齐
+            songTitleLabel.leadingAnchor.constraint(equalTo: songTitleContainer.leadingAnchor),
+            songTitleLabel.trailingAnchor.constraint(equalTo: songTitleContainer.trailingAnchor),
+            songTitleLabel.bottomAnchor.constraint(equalTo: songTitleContainer.bottomAnchor), // 与容器底部对齐
             
-            // 进度滑块 - 居中定位，作为布局中心点
+            // 进度滑块 - 调整为上方40% 下方60% 的比例
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 右侧16像素边距
-            progressSlider.centerYAnchor.constraint(equalTo: bottomBanner.centerYAnchor), // 进度滑块居中
+            // 使用简单的负值常量将进度滑块向上移动，实现上方40%位置
+            progressSlider.centerYAnchor.constraint(equalTo: bottomBanner.centerYAnchor, constant: -8),
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 左侧16像素边距
@@ -378,10 +396,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         waveformView.addGestureRecognizer(waveformTapGesture)
         waveformView.isUserInteractionEnabled = true
         
-        // 为歌曲标题添加点击手势（虽然默认隐藏）
-        let titleTapGesture = UITapGestureRecognizer(target: self, action: #selector(backButtonTapped))
-        songTitleLabel.addGestureRecognizer(titleTapGesture)
-        songTitleLabel.isUserInteractionEnabled = true
+        // 为歌曲标题容器添加点击事件
+        songTitleContainer.addTarget(self, action: #selector(backButtonTapped), for: .touchUpInside)
     }
 
 
@@ -406,6 +422,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 监听进度更新通知，用于同步播放页拖动后的进度
         NotificationCenter.default.addObserver(self, selector: #selector(handleProgressUpdateNotification), name: .musicPlayerProgressChanged, object: nil)
+        
+        // 监听文件夹图标显示状态变化通知
+        NotificationCenter.default.addObserver(self, selector: #selector(updateWaveformVisibility), name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
         
         // 配置时间标签
         timeLabel.text = formatTime(musicPlayer.currentTime)

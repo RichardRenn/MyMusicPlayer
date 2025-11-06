@@ -67,12 +67,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "chevron.up"), for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.backgroundColor = .secondarySystemBackground
-        
-        // 创建上窄下宽的梯形形状
-        let shapeLayer = CAShapeLayer()
-        button.layer.mask = shapeLayer
-        
+        button.backgroundColor = .clear  //不要背景色，避免遮挡歌曲名
         return button
     }()
     
@@ -121,6 +116,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
         return view
+    }()
+    
+    // 创建一个透明的容器视图来扩大可点击区域
+    private let songTitleContainer: UIButton = {
+        let button = UIButton(type: .custom)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.backgroundColor = .clear
+        return button
     }()
     
     private let songTitleLabel: UILabel = {
@@ -356,9 +359,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // 当视图布局更新时重新设置梯形形状
-        updateButtonTrapezoidShape()
-        
         // 注册通知
         NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerUI), name: .musicPlayerPlaybackStateChanged, object: nil)
         // 注册进度更新通知，用于同步播放页拖动后的进度
@@ -403,7 +403,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 添加底部横幅
         view.addSubview(bottomBanner)
         view.bringSubviewToFront(expandButton) // 确保展开按钮在横幅上方
-        bottomBanner.addSubview(songTitleLabel) // 添加歌曲标题标签
+        // 先添加容器视图
+        bottomBanner.addSubview(songTitleContainer)
+        // 然后将标签添加到容器中
+        songTitleContainer.addSubview(songTitleLabel) // 添加歌曲标题标签
 
         bottomBanner.addSubview(progressSlider) // 添加滑块
         bottomBanner.addSubview(timeLabel)
@@ -439,9 +442,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             
             // 展开/收起按钮
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            expandButton.widthAnchor.constraint(equalToConstant: 80),
-            expandButton.heightAnchor.constraint(equalToConstant: 20),
-            expandButton.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: 4), // 调整位置
+            expandButton.widthAnchor.constraint(equalToConstant: 60), // 扩大宽度以增加可点击区域
+            expandButton.heightAnchor.constraint(equalToConstant: 40), // 扩大高度以增加可点击区域
+            expandButton.topAnchor.constraint(equalTo: bottomBanner.topAnchor, constant: -10), // 
             
             // 歌词面板 - 包在容器中 撑满容器
             lyricsPanel.leadingAnchor.constraint(equalTo: lyricsContainer.leadingAnchor),
@@ -454,7 +457,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             lyricsContainer.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor),
             lyricsContainer.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor), // 直接连接到底部横幅顶部
             lyricsContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.17), // 歌词面板高度/屏幕高度占比
-            
             // 歌词表格视图
             lyricsTableView.topAnchor.constraint(equalTo: lyricsPanel.topAnchor),
             lyricsTableView.leadingAnchor.constraint(equalTo: lyricsPanel.leadingAnchor),
@@ -467,15 +469,20 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             bottomBanner.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -1),
             bottomBanner.heightAnchor.constraint(greaterThanOrEqualToConstant: 120), // 确保足够的高度来容纳所有元素
             
-            // 歌曲标题 - 靠左显示，相对于进度条上方
-            songTitleLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
-            songTitleLabel.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32), // 两侧各16像素边距
-            songTitleLabel.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -8), // 进度条上方8像素
+            // 歌曲标题容器 - 设置更大的可点击区域
+            songTitleContainer.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16),
+            songTitleContainer.widthAnchor.constraint(lessThanOrEqualTo: bottomBanner.widthAnchor, constant: -32),
+            songTitleContainer.topAnchor.constraint(equalTo: bottomBanner.topAnchor), // 顶部与横幅顶部齐平
+            songTitleContainer.bottomAnchor.constraint(equalTo: progressSlider.topAnchor, constant: -6), // 进度条上方8像素
+            // 歌曲标题 - 调整为底部对齐
+            songTitleLabel.leadingAnchor.constraint(equalTo: songTitleContainer.leadingAnchor),
+            songTitleLabel.trailingAnchor.constraint(equalTo: songTitleContainer.trailingAnchor),
+            songTitleLabel.bottomAnchor.constraint(equalTo: songTitleContainer.bottomAnchor), // 与容器底部对齐
             
-            // 进度滑块 - 居中定位，作为布局中心点
+            // 进度滑块 - 调整为上方40% 下方60% 的比例
             progressSlider.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
             progressSlider.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor, constant: -16), // 固定16像素右侧边距
-            progressSlider.centerYAnchor.constraint(equalTo: bottomBanner.centerYAnchor), // 进度滑块居中
+            progressSlider.centerYAnchor.constraint(equalTo: bottomBanner.centerYAnchor, constant: -8), // 进度滑块位于横幅中间靠上一些的位置
             
             // 时间标签 - 相对于进度滑块下方定位
             timeLabel.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor, constant: 16), // 固定16像素左侧边距
@@ -514,21 +521,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         bottomBanner.addGestureRecognizer(tapGesture)
         bottomBanner.isUserInteractionEnabled = true
         
-        // 为歌曲标题添加点击手势，用于快速定位到列表中的歌曲
-        let titleTapGesture = UITapGestureRecognizer(target: self, action: #selector(songTitleTapped))
-        songTitleLabel.addGestureRecognizer(titleTapGesture)
-        songTitleLabel.isUserInteractionEnabled = true
-        songTitleLabel.isAccessibilityElement = true
-        songTitleLabel.accessibilityLabel = "点击定位到当前播放歌曲"
+        // 为歌曲标题容器添加点击事件，用于快速定位到列表中的歌曲
+        songTitleContainer.addTarget(self, action: #selector(songTitleTapped), for: .touchUpInside)
+        songTitleContainer.isAccessibilityElement = true
+        songTitleContainer.accessibilityLabel = "点击定位到当前播放歌曲"
         
         setupPlayerObservers()
         setupButtonActions()
         
         // 设置展开/收起按钮的点击事件
         expandButton.addTarget(self, action: #selector(toggleLyricsPanel), for: .touchUpInside)
-        
-        // 初始化梯形形状
-        updateButtonTrapezoidShape()
         
         // 设置主题变化通知
         NotificationCenter.default.addObserver(self, selector: #selector(systemThemeChanged), name: Notification.Name(rawValue: "UIUserInterfaceStyleDidChangeNotification"), object: nil)
@@ -973,7 +975,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 // self.lyricsPanel.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
                 self.bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
                 self.bottomBanner.layoutIfNeeded()
-                self.updateButtonTrapezoidShape()
+        
             }, completion: { _ in
                 self.loadLyricsIfNeeded()
             })
@@ -992,7 +994,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                     .layerMinXMaxYCorner, .layerMaxXMaxYCorner
                 ]
                 self.bottomBanner.layoutIfNeeded()
-                self.updateButtonTrapezoidShape()
+        
             }, completion: { _ in
                 self.lyricsContainer.isHidden = true
                 self.lyricsPanel.isHidden = true
@@ -1014,40 +1016,6 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         } else {
             loadLyrics()
         }
-    }
-    
-    // 更新按钮的梯形形状
-    private func updateButtonTrapezoidShape() {
-        guard let maskLayer = expandButton.layer.mask as? CAShapeLayer else { return }
-        
-        let bounds = expandButton.bounds
-        let path = UIBezierPath()
-        
-        if isLyricsExpanded {
-            // 上宽下窄的梯形
-            let topWidth = bounds.width
-            let bottomWidth = bounds.width * 0.5
-            let offset = (topWidth - bottomWidth) / 2
-            
-            path.move(to: CGPoint(x: 0, y: 0))
-            path.addLine(to: CGPoint(x: topWidth, y: 0))
-            path.addLine(to: CGPoint(x: topWidth - offset, y: bounds.height))
-            path.addLine(to: CGPoint(x: offset, y: bounds.height))
-            path.close()
-        } else {
-            // 上窄下宽的梯形
-            let topWidth = bounds.width * 0.5
-            let bottomWidth = bounds.width
-            let offset = (bottomWidth - topWidth) / 2
-            
-            path.move(to: CGPoint(x: offset, y: 0))
-            path.addLine(to: CGPoint(x: bottomWidth - offset, y: 0))
-            path.addLine(to: CGPoint(x: bottomWidth, y: bounds.height))
-            path.addLine(to: CGPoint(x: 0, y: bounds.height))
-            path.close()
-        }
-        
-        maskLayer.path = path.cgPath
     }
     
     // 加载歌词
