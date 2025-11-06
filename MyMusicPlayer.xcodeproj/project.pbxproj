@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -20,6 +20,7 @@
 		22C512352A1B4C4400A1E52E /* LyricsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C512342A1B4C4400A1E52E /* LyricsParser.swift */; };
 		79359ADD2EAA89C6007BE053 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 79359ADC2EAA89C6007BE053 /* Assets.xcassets */; };
 		797F155D2EB7B4DC00DC126C /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = 797F155C2EB7B4DC00DC126C /* AudioKit */; };
+		79859E722EBD0A6A00777E82 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = 79859E712EBD0A6A00777E82 /* AudioKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				79859E722EBD0A6A00777E82 /* AudioKit in Frameworks */,
 				797F155D2EB7B4DC00DC126C /* AudioKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -135,7 +137,7 @@
 			);
 			mainGroup = 22C512102A1B4C3D00A1E52E;
 			packageReferences = (
-				795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */,
+				79859E702EBD0A6A00777E82 /* XCLocalSwiftPackageReference "../AudioKit-5.6.5" */,
 			);
 			productRefGroup = 22C512372A1B4C4E00A1E52E /* Products */;
 			projectDirPath = "";
@@ -500,6 +502,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		79859E702EBD0A6A00777E82 /* XCLocalSwiftPackageReference "../AudioKit-5.6.5" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../AudioKit-5.6.5";
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -515,6 +524,10 @@
 		797F155C2EB7B4DC00DC126C /* AudioKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 795BAB452EB7A5E1008E30E9 /* XCRemoteSwiftPackageReference "AudioKit" */;
+			productName = AudioKit;
+		};
+		79859E712EBD0A6A00777E82 /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
 			productName = AudioKit;
 		};
 /* End XCSwiftPackageProductDependency section */
