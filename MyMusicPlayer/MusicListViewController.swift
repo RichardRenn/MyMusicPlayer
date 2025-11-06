@@ -8,7 +8,6 @@ import Foundation
 enum ThemeMode: Int, Codable {
     case light = 0    // 浅色模式
     case dark = 1     // 深色模式
-    case system = 2   // 跟随系统
     
     // 切换到下一个主题模式
     func next() -> ThemeMode {
@@ -16,8 +15,6 @@ enum ThemeMode: Int, Codable {
         case .light:
             return .dark
         case .dark:
-            return .system
-        case .system:
             return .light
         }
     }
@@ -28,9 +25,7 @@ enum ThemeMode: Int, Codable {
         case .light:
             return "sun.min.fill"      // 太阳图标
         case .dark:
-            return "moon.stars.fill"   // 月亮
-        case .system:
-            return "a.circle"          // 跟随系统
+            return "moon.stars.fill"   // 月亮图标
         }
     }
 }
@@ -52,7 +47,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     private var currentPlayingMusicURL: URL? // 跟踪当前播放的歌曲URL
     
     // 主题相关
-    private var currentThemeMode: ThemeMode = .system
+    private var currentThemeMode: ThemeMode = .light
     
     // 文件夹图标显示控制
     private var showFolderIcons: Bool = true { 
@@ -532,8 +527,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 设置展开/收起按钮的点击事件
         expandButton.addTarget(self, action: #selector(toggleLyricsPanel), for: .touchUpInside)
         
-        // 设置主题变化通知
-        NotificationCenter.default.addObserver(self, selector: #selector(systemThemeChanged), name: Notification.Name(rawValue: "UIUserInterfaceStyleDidChangeNotification"), object: nil)
+
     }
     
     // 设置按钮点击事件
@@ -896,18 +890,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             window?.overrideUserInterfaceStyle = .light
         case .dark:
             window?.overrideUserInterfaceStyle = .dark
-        case .system:
-            window?.overrideUserInterfaceStyle = .unspecified
         }
     }
     
-    // 系统主题变化通知处理
-    @objc private func systemThemeChanged() {
-        // 只有在跟随系统模式下才需要响应系统主题变化
-        if currentThemeMode == .system {
-            applyTheme()
-        }
-    }
+
     
     // 保存主题设置
     private func saveThemeSetting() {
@@ -921,7 +907,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let themeMode = ThemeMode(rawValue: savedValue) {
             currentThemeMode = themeMode
         } else {
-            currentThemeMode = .system
+            // 默认为浅色模式
+            currentThemeMode = .light
         }
     }
     

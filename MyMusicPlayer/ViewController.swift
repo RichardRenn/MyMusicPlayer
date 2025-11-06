@@ -174,10 +174,13 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                 self.overrideUserInterfaceStyle = .light
             case 1: // dark
                 self.overrideUserInterfaceStyle = .dark
-            default: // system
-                self.overrideUserInterfaceStyle = .unspecified
+            default: // 默认使用浅色模式
+                self.overrideUserInterfaceStyle = .light
             }
             print("[ViewController] [主题设置] 已加载保存的主题模式：\(savedThemeValue)")
+        } else {
+            // 如果没有保存的设置，默认为浅色模式
+            self.overrideUserInterfaceStyle = .light
         }
     }
     
