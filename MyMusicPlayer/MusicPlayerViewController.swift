@@ -564,9 +564,11 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             songTitleLabel.text = music.title
         }
         
-        // 更新波形图动画状态
-        print("[MusicPlayerViewController] 更新波形图动画状态: \(musicPlayer.isPlaying)")
-        waveformView.isAnimating = musicPlayer.isPlaying
+        // 更新波形图动画状态，同时受播放状态和showFolderIcons开关控制
+        let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
+        let shouldAnimate = musicPlayer.isPlaying && showWaveform
+        print("[MusicPlayerViewController] 更新波形图动画状态: \(shouldAnimate) (播放状态: \(musicPlayer.isPlaying), 显示开关: \(showWaveform))")
+        waveformView.isAnimating = shouldAnimate
 
         // 根据当前播放状态更新播放/暂停按钮图标
         let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
@@ -606,9 +608,11 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
             playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
             
-            // 更新波形图动画状态
-            print("[MusicPlayerViewController] updatePlayerUI - 设置波形图动画状态: \(musicPlayer.isPlaying)")
-            waveformView.isAnimating = musicPlayer.isPlaying
+            // 更新波形图动画状态，同时受播放状态和showFolderIcons开关控制
+            let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
+            let shouldAnimate = musicPlayer.isPlaying && showWaveform
+            print("[MusicPlayerViewController] updatePlayerUI - 设置波形图动画状态: \(shouldAnimate) (播放状态: \(musicPlayer.isPlaying), 显示开关: \(showWaveform))")
+            waveformView.isAnimating = shouldAnimate
             
             // 根据播放状态控制进度更新计时器
             if musicPlayer.isPlaying {
@@ -677,8 +681,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     @objc private func previousButtonTapped() {
         musicPlayer.playPrevious()
-        // 立即更新UI（虽然playMusic方法会发送通知，但这里添加冗余调用确保UI立即响应）
-        updatePlayerUI()
+        // 移除冗余调用，依赖PlayerStateChanged通知更新UI
     }
     
     @objc private func playPauseButtonTapped() {
@@ -689,8 +692,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     @objc private func nextButtonTapped() {
         musicPlayer.playNext()
-        // 立即更新UI（虽然playMusic方法会发送通知，但这里添加冗余调用确保UI立即响应）
-        updatePlayerUI()
+        // 移除冗余调用，依赖PlayerStateChanged通知更新UI
     }
     
     @objc private func playModeButtonTapped() {

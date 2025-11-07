@@ -777,8 +777,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 底部控制按钮事件
     @objc private func previousButtonTapped() {
         musicPlayer.playPrevious()
-        // 立即更新UI
-        updatePlayerUI()
+        // 移除冗余调用，依赖PlayerStateChanged通知更新UI
     }
     
     @objc private func playPauseButtonTapped() {
@@ -795,8 +794,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     @objc private func nextButtonTapped() {
         musicPlayer.playNext()
-        // 立即更新UI
-        updatePlayerUI()
+        // 移除冗余调用，依赖PlayerStateChanged通知更新UI
     }
     
     @objc private func playModeButtonTapped() {
