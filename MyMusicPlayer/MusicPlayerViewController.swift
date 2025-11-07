@@ -870,18 +870,8 @@ class WaveformView: UIView {
     // 波形条之间的间距
     private let barSpacing: CGFloat = 3
     
-    // 波形条的颜色（使用渐变色增强视觉效果）
-    private var gradientColors: [UIColor] = [
-        .systemBlue.withAlphaComponent(0.95),
-        .systemPurple.withAlphaComponent(0.95),
-        .systemPink.withAlphaComponent(0.95)
-    ]
-    
     // 上半部分波形条数组（只显示上半部分波形）
     private var topBars: [UIView] = []
-    
-    // 上半部分渐变层数组
-    private var topGradientLayers: [CAGradientLayer] = []
     
     // 动画计时器
     private var animationTimer: Timer?
@@ -911,12 +901,9 @@ class WaveformView: UIView {
     
     // 设置波形图
     private func setupWaveform() {
-        // 清空现有的波形条和渐变层
+        // 清空现有的波形条
         topBars.forEach { $0.removeFromSuperview() }
-        topGradientLayers.forEach { $0.removeFromSuperlayer() }
-        
         topBars.removeAll()
-        topGradientLayers.removeAll()
         baseHeights.removeAll()
         
         // 计算可用宽度并调整间距
@@ -934,7 +921,6 @@ class WaveformView: UIView {
         
         // 创建波形条（只创建上半部分）
         for i in 0..<barCount {
-            // 为真实频谱数据设计的基础高度（不再使用随机值）
             // 基于频率分布的对数特性，低频部分可以有更高的基础高度
             let frequencyFactor = CGFloat(i) / CGFloat(barCount)
             // 使用对数曲线分配基础高度，让低频部分（左侧）有更高的基础高度
@@ -949,17 +935,9 @@ class WaveformView: UIView {
             topBar.layer.cornerRadius = barWidth / 2
             topBar.clipsToBounds = true
             topBar.translatesAutoresizingMaskIntoConstraints = false
+            topBar.backgroundColor = .tintColor // 设置波形条的背景色
             addSubview(topBar)
             topBars.append(topBar)
-            
-            // 为上半部分添加渐变层
-            let topGradientLayer = CAGradientLayer()
-            topGradientLayer.colors = gradientColors.map { $0.cgColor }
-            topGradientLayer.startPoint = CGPoint(x: 0.5, y: 1.0)
-            topGradientLayer.endPoint = CGPoint(x: 0.5, y: 0.0)
-            topGradientLayer.frame = topBar.bounds
-            topBar.layer.insertSublayer(topGradientLayer, at: 0)
-            topGradientLayers.append(topGradientLayer)
             
             // 设置上半部分约束 - 从底部向上延伸
             let widthConstraint = topBar.widthAnchor.constraint(equalToConstant: barWidth)
@@ -982,7 +960,7 @@ class WaveformView: UIView {
             let startOffset = (bounds.width - totalWidth) / 2
             let xOffset = startOffset + CGFloat(i) * (barWidth + effectiveSpacing)
             
-            // 方法2：获取superview中与这些视图相关的约束
+            // 获取superview中与这些视图相关的约束
             if let superview = topBar.superview {
                 let superviewConstraintsToRemove = superview.constraints.filter { constraint in
                     let involvesTopBar = (constraint.firstItem as? UIView == topBar || constraint.secondItem as? UIView == topBar)
@@ -1030,12 +1008,6 @@ class WaveformView: UIView {
         }
     }
     
-    // 不再使用模拟数据更新波形图，完全依赖实际FFT数据
-    // 此方法保留但为空，以避免定时器调用错误
-    @objc private func updateWaveform() {
-        // 现在只使用实际的FFT数据，不再生成随机模拟数据
-    }
-    
     // 更新波形图（使用实际频谱数据）
     public func updateWithSpectrumData(_ fftData: [Float]) {
         // 只有在动画模式下才处理数据
@@ -1076,8 +1048,8 @@ class WaveformView: UIView {
         
         // 更新UI操作
         DispatchQueue.main.async {
-            // 更新每个波形条（只更新上半部分）
-            for (index, (topBar, topGradient)) in zip(self.topBars, self.topGradientLayers).enumerated() {
+            // 遍历所有波形条并更新
+            for (index, topBar) in self.topBars.enumerated() {
                 // 实现镜像对称效果：高音在中间，低音在两边
                 let centerPosition = CGFloat(self.barCount) / 2.0
                 let distanceFromCenter = abs(CGFloat(index) - centerPosition)
@@ -1112,9 +1084,6 @@ class WaveformView: UIView {
                 
                 // 更新波形条高度
                 self.updateBarHeight(topBar: topBar, height: targetHeight)
-                
-                // 更新渐变层frame
-                topGradient.frame = topBar.bounds
             }
             
             // 重要！！ 执行动画 控制柱状图缓缓消失的动画的流畅度，数值越大越平滑，当小于0.05时会有很大的顿挫感
@@ -1134,10 +1103,6 @@ class WaveformView: UIView {
         // 更新最大波形高度（整个视图高度，因为只显示上半部分）
         maxBarHeight = bounds.height * 0.95
         
-        // 更新渐变层frame
-        for (topBar, topGradient) in zip(topBars, topGradientLayers) {
-            topGradient.frame = topBar.bounds
-        }
     }
     
     // 重置波形条高度
@@ -1147,13 +1112,10 @@ class WaveformView: UIView {
         
         // 更新操作
         DispatchQueue.main.async {
-            for (index, (topBar, topGradient)) in zip(self.topBars, self.topGradientLayers).enumerated() {
+            for (index, topBar) in self.topBars.enumerated() {
                 // 使用静止状态的高度（更小，更稳定）
                 let staticHeight = max(0.0, self.baseHeights[index] * 0.5)
                 self.updateBarHeight(topBar: topBar, height: staticHeight)
-                
-                // 更新渐变层frame
-                topGradient.frame = topBar.bounds
             }
             
             // 使用动画平滑过渡到静止状态
