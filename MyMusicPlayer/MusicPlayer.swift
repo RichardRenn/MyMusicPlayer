@@ -141,23 +141,21 @@ class MusicPlayer: NSObject, ObservableObject {
         if isSpectrumAnalysisEnabled {
             print("[MusicPlayer] 频谱分析已启用，创建FFT分析器")
             
-            // 创建FFT分析器，使用固定的bufferSize以获得更稳定的频谱数据
-            fftTap = FFTTap(player, bufferSize: 2048) { [weak self] fftData in
+            // 创建FFT分析器
+            fftTap = FFTTap(player) { [weak self] fftData in
                 guard let self = self else { return }
                 
                 // 过滤掉NaN和无效值，只保留有效的FFT数据
                 let validFFTData = fftData.filter { !$0.isNaN && !$0.isInfinite && $0 >= 0 }
                 
                 // 只有在频谱分析已启用、有效数据足够多且播放状态为true时才处理和传递数据
-                if isSpectrumAnalysisEnabled && validFFTData.count > Int(Double(fftData.count) * 0.8) { // 至少80%的数据有效
+                if self.isPlaying && isSpectrumAnalysisEnabled && validFFTData.count > Int(Double(fftData.count) * 0.5) { // 至少80%的数据有效
                     // 限制FFT数据处理和回调频率为每秒1次，降低CPU占用
                     let currentTime = Date().timeIntervalSince1970
                     // 重要！！ 调整为刷新频率，提高视觉流畅度同时保持较低CPU占用
                     if currentTime - self.lastFFTLogTime > 0.06 {
                         // 添加调试信息，检查FFT数据
-                        let maxValue = validFFTData.max() ?? 0
-                        let avgValue = validFFTData.reduce(0, +) / Float(validFFTData.count)
-                        // print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 最大值: \(maxValue), 平均值: \(avgValue), 播放状态: \(self.isPlaying)")
+                        print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 播放状态: \(self.isPlaying)")
                         self.lastFFTLogTime = currentTime
                     
                         // 通过回调传递频谱数据
@@ -177,8 +175,10 @@ class MusicPlayer: NSObject, ObservableObject {
             }
             
             // 启动FFT分析
-            fftTap?.start()
-            print("[MusicPlayer] FFT分析器初始化成功，使用bufferSize: 1024")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.fftTap?.start()
+            }
+            print("[MusicPlayer] FFT分析器初始化成功")
         } else {
             print("[MusicPlayer] 频谱分析已禁用，不创建FFT分析器")
         }
@@ -354,7 +354,9 @@ class MusicPlayer: NSObject, ObservableObject {
                 
                 // 重新建立 FFTTap
                 fftTap?.stop()
-                fftTap?.start()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.fftTap?.start()
+                }
                 
                 // 启动进度更新计时器
                 startProgressTimer()
@@ -363,8 +365,6 @@ class MusicPlayer: NSObject, ObservableObject {
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     self.updateNowPlayingInfo()
-                    // 更新最后更新时间，避免短时间内重复更新
-                    self.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
                 }
             } else {
                 throw NSError(domain: "MusicPlayerError", code: -1, userInfo: [NSLocalizedDescriptionKey: "AudioEngine未能启动"])            }
@@ -387,7 +387,7 @@ class MusicPlayer: NSObject, ObservableObject {
         stopProgressTimer()
         
         // 创建新的计时器
-        progressTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
+        progressTimer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
     }
     
     // 停止进度更新计时器
@@ -396,30 +396,44 @@ class MusicPlayer: NSObject, ObservableObject {
         progressTimer = nil
     }
     
-    // 用于跟踪上一次更新Now Playing信息的时间
-    private var lastNowPlayingUpdateTime: TimeInterval = 0
-    
     // 用于限制FFT日志输出频率
     private var lastFFTLogTime: TimeInterval = 0
     
+    // 上一次播放时间，用于检测播放是否实际在前进
+    private var lastPlayerTime: TimeInterval = -1
+    // 连续检测到播放停滞的次数
+    private var playbackStallCount: Int = 0
+    
     // 更新播放进度
     @objc private func updateProgress() {
-        // 添加调试打印
-
+        // 获取当前状态
+        let engineRunning = engine.avEngine.isRunning
+        let playerPlaying = player.isPlaying
+        let currentPlayerTime = player.currentTime
         
-        // 使用AudioKit播放器的当前时间
-        currentTime = player.currentTime
-
+        // 检测播放是否实际在前进（时间是否更新）
+        let isActuallyPlaying = isPlaying && playerPlaying && currentPlayerTime > lastPlayerTime + 0.01
         
-        // 提高Now Playing信息更新频率，每1秒更新一次，确保控制中心进度条流畅更新
-        let currentTime = Date().timeIntervalSince1970
-        if currentTime - lastNowPlayingUpdateTime >= 1.0 {
-            updateNowPlayingInfo()
-            lastNowPlayingUpdateTime = currentTime
+        // 播放停滞检测
+        if isPlaying && playerPlaying && !isActuallyPlaying {
+            playbackStallCount += 1
+            print("[播放状态监控] 警告: 检测到播放停滞! 状态显示播放中但时间未前进, 停滞次数: \(playbackStallCount)")
+        } else {
+            playbackStallCount = 0
         }
         
+        print("[播放状态监控] isPlaying: \(isPlaying), player状态: \(playerPlaying ? "播放中" : "已停止"), 引擎状态: \(engineRunning ? "运行中" : "已停止"), 当前时间: \(String(format: "%.2f", currentPlayerTime)), 实际播放: \(isActuallyPlaying ? "是" : "否")")
+        
+        // 更新时间记录
+        lastPlayerTime = currentPlayerTime
+        
+        // 使用AudioKit播放器的当前时间
+        currentTime = currentPlayerTime
+        
+        updateNowPlayingInfo()
+        
         // 检查播放是否完成（当AudioKit播放器到达结尾时）
-        if isPlaying && player.currentTime >= player.duration && player.duration > 0 {
+        if isPlaying && currentPlayerTime >= player.duration && player.duration > 0 {
             handlePlaybackFinished()
         }
     }
@@ -508,8 +522,6 @@ class MusicPlayer: NSObject, ObservableObject {
     func pause() {
         // 确保在主线程执行
         DispatchQueue.main.async {
-            // 重置上次更新时间
-            self.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
             // 确保音频会话激活
             self.becomeActiveMediaPlayer()
             
@@ -546,8 +558,6 @@ class MusicPlayer: NSObject, ObservableObject {
             [weak self] in
             guard let self = self else { return }
             
-            // 重置上次更新时间
-            self.lastNowPlayingUpdateTime = Date().timeIntervalSince1970
             // 确保音频会话激活
             self.becomeActiveMediaPlayer()
             
@@ -584,7 +594,9 @@ class MusicPlayer: NSObject, ObservableObject {
                         self.setupFFTAnalysis()
                     } else {
                         // 如果频谱分析未启用，至少尝试启动现有的FFT分析器
-                        self.fftTap?.start()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            self.fftTap?.start()
+                        }
                     }
                     
                     // 发送播放状态变化通知
@@ -795,7 +807,7 @@ class MusicPlayer: NSObject, ObservableObject {
         }
         
         // 延迟重新设置FFT分析器，避免频繁操作
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             [weak self] in
             guard let self = self else { return }
             if self.isSpectrumAnalysisEnabled && self.engine.avEngine.isRunning {
@@ -803,7 +815,7 @@ class MusicPlayer: NSObject, ObservableObject {
                 self.setupFFTAnalysis()
             } else {
                 // 否则只恢复FFT分析器
-                self.fftTap?.start()
+                fftTap?.start()
             }
         }
     }

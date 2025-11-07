@@ -1139,7 +1139,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 启动更新计时器
     private func startUpdateTimer() {
         stopUpdateTimer() // 先停止之前的计时器
-        updateTimer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
+        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
     }
     
     // 停止更新计时器
@@ -1497,8 +1497,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 更新进度
     @objc private func updateProgress() {
-        // 只有当用户不在拖动滑块时才更新UI
-        if !isSeeking {
+        // 只有当播放器正在播放且用户不在拖动滑块时才更新UI
+        if musicPlayer.isPlaying && !isSeeking {
             let progress = musicPlayer.currentTime / musicPlayer.totalTime
     
             progressSlider.value = Float(progress) // 同时更新滑块位置
@@ -1509,6 +1509,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             
             // 更新歌词显示
             updateLyricDisplay()
+        } else if !musicPlayer.isPlaying {
+            // 如果播放器已暂停，强制停止计时器
+            stopUpdateTimer()
         }
     }
     
