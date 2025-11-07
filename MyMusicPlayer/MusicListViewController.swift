@@ -843,8 +843,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let refreshImage = UIImage(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
         let refreshButton = UIBarButtonItem(image: refreshImage, style: .plain, target: self, action: #selector(refreshButtonTapped))
         
-        // 根据眼镜开关状态设置左侧按钮可见性
-        navigationItem.leftBarButtonItems = showFolderIcons ? [addButton, refreshButton] : nil
+        // 始终显示添加和刷新按钮，不受眼镜图标控制
+        navigationItem.leftBarButtonItems = [addButton, refreshButton]
     }
     
     // 更新右侧导航栏按钮可见性
@@ -854,16 +854,11 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let folderIconBarButton = UIBarButtonItem(image: folderIconImage, style: .plain, target: self, action: #selector(folderIconToggleButtonTapped))
         folderIconBarButton.width = 32
         
-        // 主题按钮受开关控制
-        if showFolderIcons {
-            let themeIconImage = UIImage(systemName: currentThemeMode.iconName)
-            let themeBarButton = UIBarButtonItem(image: themeIconImage, style: .plain, target: self, action: #selector(themeButtonTapped))
-            themeBarButton.width = 32
-            navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
-        } else {
-            // 只保留眼镜图标按钮
-            navigationItem.rightBarButtonItems = [folderIconBarButton]
-        }
+        // 始终显示主题按钮，不受眼镜图标控制
+        let themeIconImage = UIImage(systemName: currentThemeMode.iconName)
+        let themeBarButton = UIBarButtonItem(image: themeIconImage, style: .plain, target: self, action: #selector(themeButtonTapped))
+        themeBarButton.width = 32
+        navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
     }
     
     // 主题切换按钮点击事件
