@@ -1,7 +1,6 @@
 import Foundation
 import AVFoundation
 import MediaPlayer
-import AudioKit
 
 class DirectoryItem: Equatable {
     let url: URL?
@@ -76,7 +75,7 @@ enum PlayMode: Int, CaseIterable {
     }
 }
 
-class MusicPlayer: NSObject, ObservableObject {
+class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     // 单例模式
     static let shared = MusicPlayer()
     
@@ -99,89 +98,21 @@ class MusicPlayer: NSObject, ObservableObject {
     // 计时器用于更新播放进度
     private var progressTimer: Timer?
     
-    // AudioKit相关组件
-    private let engine = AudioEngine()
-    private let player = AudioPlayer()
-    private var fftTap: FFTTap?
-   
-    
-    // 频谱数据回调闭包
-    public var spectrumDataCallback: (([Float]) -> Void)? = nil
-    
-    // 控制是否启用频谱分析计算
-    public var isSpectrumAnalysisEnabled: Bool = false
+    // 音频播放器组件
+    private var audioPlayer: AVAudioPlayer? = nil
     
     override init() {
         // 从用户数据加载播放范围锁定状态
         isRangeLocked = UserDefaults.standard.bool(forKey: PlayMode.rangeLockKey)
         super.init()
         setupAudioSession()
-        setupAudioKit()
+        setupAudioPlayer()
         print("[MusicPlayer] 从用户数据加载播放范围锁定状态: \(isRangeLocked)")
     }
     
-    // 设置AudioKit
-    private func setupAudioKit() {
-        // 配置AudioKit引擎和播放器
-        engine.output = player
-        
-        // 设置FFT分析
-        setupFFTAnalysis()
-
-        print("[MusicPlayer] AudioKit 初始化成功")
-    }
-    
-    // 设置FFT分析
-    internal func setupFFTAnalysis() {
-        // 先停止之前可能存在的FFT分析器
-        fftTap?.stop()
-        fftTap = nil
-        
-        // 只有在频谱分析已启用时才创建FFT分析器
-        if isSpectrumAnalysisEnabled {
-            print("[MusicPlayer] 频谱分析已启用，创建FFT分析器")
-            
-            // 创建FFT分析器
-            fftTap = FFTTap(player) { [weak self] fftData in
-                guard let self = self else { return }
-                
-                // 过滤掉NaN和无效值，只保留有效的FFT数据
-                let validFFTData = fftData.filter { !$0.isNaN && !$0.isInfinite && $0 >= 0 }
-                
-                // 只有在频谱分析已启用、有效数据足够多且播放状态为true时才处理和传递数据
-                if self.isPlaying && isSpectrumAnalysisEnabled && validFFTData.count > Int(Double(fftData.count) * 0.5) { // 至少80%的数据有效
-                    // 限制FFT数据处理和回调频率为每秒1次，降低CPU占用
-                    let currentTime = Date().timeIntervalSince1970
-                    // 重要！！ 调整为刷新频率，提高视觉流畅度同时保持较低CPU占用
-                    if currentTime - self.lastFFTLogTime > 0.06 {
-                        // 添加调试信息，检查FFT数据
-                        print("[MusicPlayer] FFT数据 - 数量: \(validFFTData.count), 播放状态: \(self.isPlaying)")
-                        self.lastFFTLogTime = currentTime
-                    
-                        // 通过回调传递频谱数据
-                        if let callback = self.spectrumDataCallback {
-                            DispatchQueue.main.async {
-                                callback(validFFTData)
-                            }
-                        }
-                    }
-                } else if !self.isPlaying {
-                    // 在暂停状态下，如果数据质量差，减少日志输出频率
-                    if Date().timeIntervalSince1970 - self.lastFFTLogTime > 2.0 {
-                        print("[MusicPlayer] 暂停状态下FFT数据质量差，跳过处理 - 有效数据: \(validFFTData.count)/\(fftData.count)")
-                        self.lastFFTLogTime = Date().timeIntervalSince1970
-                    }
-                }
-            }
-            
-            // 启动FFT分析
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.fftTap?.start()
-            }
-            print("[MusicPlayer] FFT分析器初始化成功")
-        } else {
-            print("[MusicPlayer] 频谱分析已禁用，不创建FFT分析器")
-        }
+    // 初始化音频播放器组件
+    private func setupAudioPlayer() {
+        print("[MusicPlayer] 音频播放器初始化成功")
     }
     
     // 设置音频会话
@@ -331,43 +262,32 @@ class MusicPlayer: NSObject, ObservableObject {
             securityScopedResources.append(url)
             print("[MusicPlayer] 成功获取音频文件访问权限: \(url.lastPathComponent)")
         }
-        
+
         do {
             // 音频会话仅在需要时激活
             becomeActiveMediaPlayer()
             
-            // 确保引擎已准备好并正确启动
-            if !engine.avEngine.isRunning {
-                print("[MusicPlayer] 尝试启动AudioEngine")
-                try engine.start()
-                print("[MusicPlayer] AudioEngine启动成功")
+            // 创建并配置AVAudioPlayer
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.delegate = self
+            
+            // 设置音频会话
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            // 开始播放
+            audioPlayer?.play()
+            isPlaying = true
+            totalTime = audioPlayer?.duration ?? 0
+            
+            // 启动进度更新计时器
+            startProgressTimer()
+            
+            // 立即更新Now Playing信息
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.updateNowPlayingInfo()
             }
-            
-            // 使用AudioKit播放器
-            try player.load(url: url)
-            
-            // 再次确认引擎正在运行后再播放
-            if engine.avEngine.isRunning {
-                player.play()
-                isPlaying = true
-                totalTime = player.duration
-                
-                // 重新建立 FFTTap
-                fftTap?.stop()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    self.fftTap?.start()
-                }
-                
-                // 启动进度更新计时器
-                startProgressTimer()
-                
-                // 立即更新Now Playing信息
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    self.updateNowPlayingInfo()
-                }
-            } else {
-                throw NSError(domain: "MusicPlayerError", code: -1, userInfo: [NSLocalizedDescriptionKey: "AudioEngine未能启动"])            }
         } catch {
             print("[MusicPlayer] 播放音乐失败: \(error)")
             isPlaying = false
@@ -396,46 +316,20 @@ class MusicPlayer: NSObject, ObservableObject {
         progressTimer = nil
     }
     
-    // 用于限制FFT日志输出频率
-    private var lastFFTLogTime: TimeInterval = 0
-    
-    // 上一次播放时间，用于检测播放是否实际在前进
-    private var lastPlayerTime: TimeInterval = -1
     // 连续检测到播放停滞的次数
     private var playbackStallCount: Int = 0
     
     // 更新播放进度
     @objc private func updateProgress() {
-        // 获取当前状态
-        let engineRunning = engine.avEngine.isRunning
-        let playerPlaying = player.isPlaying
-        let currentPlayerTime = player.currentTime
+        // 更新当前播放时间
+        currentTime = audioPlayer?.currentTime ?? 0
         
-        // 检测播放是否实际在前进（时间是否更新）
-        let isActuallyPlaying = isPlaying && playerPlaying && currentPlayerTime > lastPlayerTime + 0.01
-        
-        // 播放停滞检测
-        if isPlaying && playerPlaying && !isActuallyPlaying {
-            playbackStallCount += 1
-            print("[播放状态监控] 警告: 检测到播放停滞! 状态显示播放中但时间未前进, 停滞次数: \(playbackStallCount)")
-        } else {
-            playbackStallCount = 0
+        // 检查播放是否完成
+        if isPlaying && currentTime >= totalTime && totalTime > 0 {
+            audioPlayerDidFinishPlaying(audioPlayer!, successfully: true)
         }
-        
-        print("[播放状态监控] isPlaying: \(isPlaying), player状态: \(playerPlaying ? "播放中" : "已停止"), 引擎状态: \(engineRunning ? "运行中" : "已停止"), 当前时间: \(String(format: "%.2f", currentPlayerTime)), 实际播放: \(isActuallyPlaying ? "是" : "否")")
-        
-        // 更新时间记录
-        lastPlayerTime = currentPlayerTime
-        
-        // 使用AudioKit播放器的当前时间
-        currentTime = currentPlayerTime
         
         updateNowPlayingInfo()
-        
-        // 检查播放是否完成（当AudioKit播放器到达结尾时）
-        if isPlaying && currentPlayerTime >= player.duration && player.duration > 0 {
-            handlePlaybackFinished()
-        }
     }
     
     // 更新控制中心显示信息
@@ -454,8 +348,8 @@ class MusicPlayer: NSObject, ObservableObject {
             MPMediaItemPropertyAlbumTitle: currentMusic.album.isEmpty ? "未知专辑" : currentMusic.album,
             
             // 播放状态信息
-            MPMediaItemPropertyPlaybackDuration: player.duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: player.currentTime,
+            MPMediaItemPropertyPlaybackDuration: totalTime,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
             
             // 播放列表信息
@@ -514,101 +408,31 @@ class MusicPlayer: NSObject, ObservableObject {
         if isPlaying {
             pause()
         } else {
-            resume()
+            if currentMusic != nil {
+                resume()
+            } else if !currentDirectoryPlaylist.isEmpty {
+                playMusic(currentDirectoryPlaylist[0], at: 0)
+            }
         }
     }
     
     // 暂停播放
     func pause() {
-        // 确保在主线程执行
-        DispatchQueue.main.async {
-            // 确保音频会话激活
-            self.becomeActiveMediaPlayer()
-            
-            // 暂停播放
-            self.player.pause()
-            self.isPlaying = false
-            
-            // 立即更新Now Playing信息
-            self.updateNowPlayingInfo()
-            
-            // 0.5秒后再次更新，确保状态正确同步
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                // 使用weak self避免循环引用
-                [weak self] in
-                self?.updateNowPlayingInfo()
-            }
-            
-            // 停止进度更新计时器
-            self.stopProgressTimer()
-            
-            // 停止FFT分析，避免暂停后波形图仍在动
-            self.fftTap?.stop()
-            
-            // 发送播放状态变化通知
-            NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        if audioPlayer?.isPlaying ?? false {
+            audioPlayer?.pause()
+            isPlaying = false
+            stopProgressTimer()
+            updateNowPlayingInfo()
         }
     }
     
     // 恢复播放
     func resume() {
-        // 确保在主线程执行
-        DispatchQueue.main.async {
-            // 使用weak self避免内存泄漏
-            [weak self] in
-            guard let self = self else { return }
-            
-            // 确保音频会话激活
-            self.becomeActiveMediaPlayer()
-            
-            // 确保引擎已启动
-            do {
-                if !self.engine.avEngine.isRunning {
-                    print("[MusicPlayer] 恢复播放时尝试启动AudioEngine")
-                    try self.engine.start()
-                    print("[MusicPlayer] 恢复播放时AudioEngine启动成功")
-                }
-                
-                // 再次确认引擎正在运行后再播放
-                if self.engine.avEngine.isRunning {
-                    // 开始播放
-                    self.player.play()
-                    self.isPlaying = true
-                    
-                    // 立即更新Now Playing信息
-                    self.updateNowPlayingInfo()
-                    
-                    // 0.5秒后再次更新，确保状态正确同步
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        // 使用weak self避免循环引用
-                        [weak self] in
-                        self?.updateNowPlayingInfo()
-                    }
-                    
-                    // 开始进度更新计时器
-                    self.startProgressTimer()
-                    
-                    // 重新设置并启动FFT分析器
-                    if self.isSpectrumAnalysisEnabled {
-                        print("[MusicPlayer] 恢复播放时重新设置FFT分析器")
-                        self.setupFFTAnalysis()
-                    } else {
-                        // 如果频谱分析未启用，至少尝试启动现有的FFT分析器
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            self.fftTap?.start()
-                        }
-                    }
-                    
-                    // 发送播放状态变化通知
-                    NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
-                } else {
-                    print("[MusicPlayer] 恢复播放失败: AudioEngine未能启动")
-                    self.isPlaying = false
-                }
-            } catch {
-                print("[MusicPlayer] 恢复播放失败: \(error)")
-                self.isPlaying = false
-            }
+        if !(audioPlayer?.isPlaying ?? false) && !currentDirectoryPlaylist.isEmpty {
+            audioPlayer?.play()
+            isPlaying = true
+            startProgressTimer()
+            updateNowPlayingInfo()
         }
     }
     
@@ -764,122 +588,93 @@ class MusicPlayer: NSObject, ObservableObject {
     }
     
     // 处理播放完成
-    private func handlePlaybackFinished() {
-        // 当前歌曲播放完成，根据播放模式决定下一首
-        if playMode == .repeatOne {
-            // 单曲循环，重新播放当前歌曲
-            if let currentMusicURL = currentMusic?.url {
-                playAudio(currentMusicURL)
+    // AVAudioPlayerDelegate方法：播放完成时的处理
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        if flag {
+            // 检查是否启用了范围锁定
+            if isRangeLocked {
+                // 如果启用了范围锁定，重新播放当前曲目
+                if let currentMusicURL = currentMusic?.url {
+                    playAudio(currentMusicURL)
+                }
+            } else {
+                // 根据播放模式决定下一首
+                switch playMode {
+                case .sequence:
+                    playNext()
+                case .repeatOne:
+                    if let currentMusicURL = currentMusic?.url {
+                        playAudio(currentMusicURL)
+                    }
+                case .shuffle:
+                    playNext()
+                }
             }
-        } else {
-            // 其他模式，播放下一首
-            playNext()
         }
     }
     
     // 跳转到指定时间
     func seek(to time: TimeInterval) {
-        // 保存当前播放状态
-        let wasPlaying = isPlaying
-
-        // 先停止进度更新计时器，避免在seek过程中更新currentTime
-        stopProgressTimer()
-        
-        // 在执行seek操作前暂时停止FFT分析器，确保状态一致性
-        fftTap?.stop()
-
-        // 计算相对偏移量而不是使用绝对时间
-        let offset = time - currentTime
-
-        // 使用seek方法跳转位置，传入相对偏移量
-        player.seek(time: offset)
-
-        // 明确设置currentTime，确保UI能够立即更新到正确位置
-        currentTime = time
-
-        // 如果之前是暂停状态，确保在seek后仍然保持暂停
-        if !wasPlaying {
-            player.pause()
-            isPlaying = false
-        } else {
-            // 如果正在播放，重新启动进度更新计时器
-            startProgressTimer()
-        }
-        
-        // 延迟重新设置FFT分析器，避免频繁操作
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            [weak self] in
-            guard let self = self else { return }
-            if self.isSpectrumAnalysisEnabled && self.engine.avEngine.isRunning {
-                // 只在频谱分析启用且引擎运行时重新设置
-                self.setupFFTAnalysis()
-            } else {
-                // 否则只恢复FFT分析器
-                fftTap?.start()
-            }
+        if !currentDirectoryPlaylist.isEmpty {
+            let normalizedTime = max(0, min(time, totalTime))
+            audioPlayer?.currentTime = normalizedTime
+            currentTime = normalizedTime
+            
+            // 更新播放进度
+            updateNowPlayingInfo()
         }
     }
     
     // 停止播放
     func stop() {
-        // 停止FFT分析器
-        fftTap?.stop()
+        // 停止播放的实现
+        stopAudioComponents()
         
-        // 停止播放器
-        player.stop()
+        audioPlayer?.stop()
         
-        // 先停止再seek到开始位置
-        player.seek(time: -currentTime) // 重置到开始位置
-        
+        // 重置状态
         isPlaying = false
+        currentTime = 0
         
         // 停止进度更新计时器
         stopProgressTimer()
         
-        // 延迟停用音频会话，避免快速操作导致的冲突
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            [weak self] in
-            guard let self = self else { return }
-            // 尝试停用音频会话，系统会自动处理未激活的情况
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            print("[MusicPlayer] 音频会话已尝试停用")
-        }
-        
-        // 清除当前播放音乐，使播放横幅完全消失
-        currentMusic = nil
-        currentIndex = -1
-        
-        // 清空播放信息
+        // 清除现在播放信息
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         
-        // 发送播放器状态改变通知
-        NotificationCenter.default.post(name: NSNotification.Name("PlayerStateChanged"), object: nil)
+        // 释放安全作用域资源
+        clearSecurityScopedResources()
+    }
+    
+    // 停止相关音频组件
+    func stopAudioComponents() {
+        // 释放AVAudioPlayer
+        audioPlayer = nil
+        print("[MusicPlayer] 音频播放器已停止")
+        
+        // 释放访问权限
+        clearSecurityScopedResources()
     }
     
     // 清理资源
     deinit {
         print("[MusicPlayer] 开始清理资源")
         
-        // 停止计时器
+        // 停止进度更新计时器
         stopProgressTimer()
         
-        // 清理FFT分析器
-        fftTap?.stop()
-        fftTap = nil
-        
-        // 停止播放器和引擎
-        player.stop()
-        engine.stop()
+        // 释放音频播放器
+        audioPlayer = nil
         
         // 尝试停用音频会话
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         print("[MusicPlayer] 音频会话已尝试停用")
         
-        // 清除安全范围资源
+        // 清除安全作用域资源
         clearSecurityScopedResources()
         
-        // 清空播放信息
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        // 移除所有通知监听
+        NotificationCenter.default.removeObserver(self)
         
         print("[MusicPlayer] 资源清理完成")
     }
