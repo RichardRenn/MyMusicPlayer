@@ -56,6 +56,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         }
     }
     
+    // 编辑菜单是否展开
+    private var isEditMenuExpanded = false
+    // 设置菜单是否展开
+    private var isSettingsMenuExpanded = false
+    private var directoryProgresses: [Float] = [] // 存储各目录的扫描进度
+    
     // UI元素
     // 展开/收起歌词按钮
     private let expandButton: UIButton = {
@@ -107,9 +113,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     private let bottomBanner: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
+        // view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
+        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
+        // 添加阴影效果
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOffset = CGSize(width: 0, height: -4)
+        view.layer.shadowRadius = 8
+        view.clipsToBounds = false
         return view
     }()
     
@@ -418,13 +431,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         bottomBanner.addSubview(allButtonsStack)
         
         // 为底部横幅添加悬浮样式和圆角
-        bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
-        // bottomBanner.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
-        // bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -2) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
-        // bottomBanner.layer.shadowOpacity = 0.2 // 阴影不透明度为 0.1（很淡的阴影）
-        // bottomBanner.layer.shadowRadius = 1 // 阴影的模糊半径
-        // bottomBanner.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
-        bottomBanner.layer.cornerRadius = 24 // 让视图的角变圆，半径是 24
+        // bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
+        bottomBanner.backgroundColor = .systemBackground
+        // 添加阴影效果
+        bottomBanner.layer.shadowColor = UIColor.black.cgColor
+        bottomBanner.layer.shadowOpacity = 0.1
+        bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -4)
+        bottomBanner.layer.shadowRadius = 8
+        bottomBanner.clipsToBounds = false
+        bottomBanner.layer.cornerRadius = 12 // 让视图的角变圆，半径
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
         
         // 设置约束 - 全部使用百分比实现自适应布局
@@ -628,11 +643,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         var completedScans = 0
         
         // 用于跟踪每个目录的扫描进度
-        var directoryProgresses: [Int: Double] = [:]
+        var currentDirectoryProgresses: [Int: Double] = [:]
         // 初始化所有目录的进度为0
         for index in 0..<totalDirectories {
-            directoryProgresses[index] = 0.0
+            currentDirectoryProgresses[index] = 0.0
         }
+        
+        // 确保类成员变量directoryProgresses的大小正确
+        self.directoryProgresses = Array(repeating: 0.0, count: totalDirectories)
         
         // 记录最后更新进度的目录索引
         var lastUpdatedDirectoryIndex = 0
@@ -648,17 +666,19 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         present(progressAlert, animated: true)
         
         // 更新进度的函数
-        func updateProgress() {
+        func updatePlayProgress() {
             DispatchQueue.main.async {
                 // 计算总进度（所有目录进度的平均值）
-                let totalProgress = directoryProgresses.values.reduce(0, +) / Double(totalDirectories)
+                let totalProgress = currentDirectoryProgresses.values.reduce(0, +) / Double(totalDirectories)
                 let progressPercentage = Int(totalProgress * 100)
                 
                 // 获取最后更新的文件夹名称
-                let currentFolderName = self.rootDirectoryItems[lastUpdatedDirectoryIndex].name
-                
-                // 动态更新alert的消息内容，不重新创建alert
-                progressAlert.message = "正在扫描[\(currentFolderName)]\n进度: \(progressPercentage)%"
+                if lastUpdatedDirectoryIndex < self.rootDirectoryItems.count {
+                    let currentFolderName = self.rootDirectoryItems[lastUpdatedDirectoryIndex].name
+                    
+                    // 动态更新alert的消息内容，不重新创建alert
+                    progressAlert.message = "正在扫描[\(currentFolderName)]\n进度: \(progressPercentage)%"
+                }
             }
         }
         
@@ -685,22 +705,28 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 continue 
             }
             
-            scanner.scanDirectory(directoryURL, progressHandler: { [weak self] progress in
+            scanner.scanDirectory(directoryURL, scanProgressHandler: { [weak self] progress in
                 guard let self = self else { return }
                 
-                // 更新当前目录的进度
-                directoryProgresses[index] = progress
+                // 首先更新局部字典变量
+                currentDirectoryProgresses[index] = progress
+                
+                // 然后安全地更新类成员变量数组
+                if index < self.directoryProgresses.count {
+                    self.directoryProgresses[index] = Float(progress)
+                }
+                
                 // 更新最后活动的目录索引
                 lastUpdatedDirectoryIndex = index
                 
                 // 更新进度显示
-                updateProgress()
+                updatePlayProgress()
             }, completionHandler: { [weak self] newRootItem in
                 guard let self = self else { return }
                 
                 DispatchQueue.main.async {
-                    // 更新对应的根目录项
-                    if let newRoot = newRootItem {
+                    // 安全地更新对应的根目录项
+                    if index < self.rootDirectoryItems.count, let newRoot = newRootItem {
                         self.rootDirectoryItems[index].subdirectories = newRoot.subdirectories
                         self.rootDirectoryItems[index].musicFiles = newRoot.musicFiles
                     }
@@ -819,8 +845,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         updateLeftBarButtonsVisibility()
         updateRightBarButtonsVisibility()
         
-        // 发送通知，通知波形图更新显示状态
-        NotificationCenter.default.post(name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
+        // 更新设置面板中的按钮文字（无动画）
+        if let folderIconButton = settingsPanel.subviews.first as? UIButton {
+            UIView.performWithoutAnimation {
+                folderIconButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
+                folderIconButton.layoutIfNeeded() // 确保立即刷新布局
+            }
+        }
     }
     
     // 保存文件夹图标设置
@@ -835,30 +866,202 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 更新左侧导航栏按钮可见性
     private func updateLeftBarButtonsVisibility() {
-        // 添加
-        let addImage = UIImage(systemName: "plus")
-        let addButton = UIBarButtonItem(image: addImage, style: .plain, target: self, action: #selector(addFolderButtonTapped))
+        // 创建编辑按钮（使用pencil图标）
+        let editButton = UIBarButtonItem(image: UIImage(systemName: "pencil"), style: .plain, target: self, action: #selector(editButtonTapped))
         
-        // 刷新
-        let refreshImage = UIImage(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-        let refreshButton = UIBarButtonItem(image: refreshImage, style: .plain, target: self, action: #selector(refreshButtonTapped))
+        // 只显示编辑按钮在导航栏左侧
+        navigationItem.leftBarButtonItems = [editButton]
+    }
+    
+    // 编辑面板视图
+    // 设置面板
+    private lazy var settingsPanel: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBackground
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 12
+        // 仅保留左下角、右下角、左上角的圆角
+        view.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMinXMinYCorner]
+        view.isHidden = true
+        // 添加阴影效果
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOffset = CGSize(width: 0, height: 4)
+        view.layer.shadowRadius = 8
+        view.clipsToBounds = false
         
-        // 始终显示添加和刷新按钮，不受眼镜图标控制
-        navigationItem.leftBarButtonItems = [addButton, refreshButton]
+        // 文件夹图标切换按钮
+        let folderIconToggleButton = UIButton(type: .system)
+        folderIconToggleButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
+        folderIconToggleButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        folderIconToggleButton.titleLabel?.textAlignment = .right
+        folderIconToggleButton.contentHorizontalAlignment = .right
+        folderIconToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        folderIconToggleButton.addTarget(self, action: #selector(folderIconToggleButtonTapped), for: .touchUpInside)
+        view.addSubview(folderIconToggleButton)
+        
+        // 主题切换按钮
+        let themeToggleButton = UIButton(type: .system)
+        themeToggleButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
+        themeToggleButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        themeToggleButton.titleLabel?.textAlignment = .right
+        themeToggleButton.contentHorizontalAlignment = .right
+        themeToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        themeToggleButton.addTarget(self, action: #selector(themeButtonTapped), for: .touchUpInside)
+        view.addSubview(themeToggleButton)
+        
+        // 设置约束
+        NSLayoutConstraint.activate([
+            folderIconToggleButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            folderIconToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            folderIconToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            folderIconToggleButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            themeToggleButton.topAnchor.constraint(equalTo: folderIconToggleButton.bottomAnchor, constant: 8),
+            themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            themeToggleButton.heightAnchor.constraint(equalToConstant: 44),
+            themeToggleButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
+        ])
+        
+        return view
+    }()
+    
+    private lazy var editPanel: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBackground
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 12
+        // 仅保留左下角、右下角、右上角的圆角
+        view.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMaxXMinYCorner]
+        view.isHidden = true
+        // 添加阴影效果
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOffset = CGSize(width: 0, height: 4)
+        view.layer.shadowRadius = 8
+        view.clipsToBounds = false
+        
+        // 添加文件夹按钮
+        let addFolderButton = UIButton(type: .system)
+        addFolderButton.setTitle("添加", for: .normal)
+        addFolderButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        addFolderButton.titleLabel?.textAlignment = .left
+        addFolderButton.contentHorizontalAlignment = .left
+        addFolderButton.translatesAutoresizingMaskIntoConstraints = false
+        addFolderButton.addTarget(self, action: #selector(addFolderButtonTapped), for: .touchUpInside)
+        view.addSubview(addFolderButton)
+        
+        // 刷新音乐库按钮
+        let refreshButton = UIButton(type: .system)
+        refreshButton.setTitle("刷新", for: .normal)
+        refreshButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        refreshButton.titleLabel?.textAlignment = .left
+        refreshButton.contentHorizontalAlignment = .left
+        refreshButton.translatesAutoresizingMaskIntoConstraints = false
+        refreshButton.addTarget(self, action: #selector(refreshButtonTapped), for: .touchUpInside)
+        view.addSubview(refreshButton)
+        
+        // 设置按钮约束
+        NSLayoutConstraint.activate([
+            addFolderButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            addFolderButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            addFolderButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            addFolderButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            refreshButton.topAnchor.constraint(equalTo: addFolderButton.bottomAnchor, constant: 8),
+            refreshButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            refreshButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            refreshButton.heightAnchor.constraint(equalToConstant: 44),
+            refreshButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
+        ])
+        
+        return view
+    }()
+    
+    // 编辑按钮点击事件
+    @objc private func editButtonTapped() {
+        // 先隐藏设置面板（如果显示）
+        if isSettingsMenuExpanded {
+            isSettingsMenuExpanded = false
+            settingsPanel.isHidden = true
+            settingsPanel.removeFromSuperview()
+        }
+        
+        // 切换编辑面板显示状态
+        isEditMenuExpanded.toggle()
+        
+        if isEditMenuExpanded {
+            // 显示编辑面板
+            view.addSubview(editPanel)
+            
+            // 设置编辑面板约束：紧贴导航栏下方，宽度根据内容自适应
+            NSLayoutConstraint.activate([
+                editPanel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                editPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                editPanel.heightAnchor.constraint(equalToConstant: 128) // 固定高度，包含两个按钮和间距
+            ])
+            
+            // 直接显示面板，无需动画
+            editPanel.alpha = 1
+            editPanel.transform = .identity
+            editPanel.isHidden = false
+        } else {
+            // 直接隐藏面板，无需动画
+            editPanel.isHidden = true
+            editPanel.removeFromSuperview()
+        }
     }
     
     // 更新右侧导航栏按钮可见性
-    private func updateRightBarButtonsVisibility() {
-        // 直接使用UIBarButtonItem创建眼镜图标按钮
-        let folderIconImage = UIImage(systemName: showFolderIcons ? "eyeglasses" : "eyeglasses.slash")
-        let folderIconBarButton = UIBarButtonItem(image: folderIconImage, style: .plain, target: self, action: #selector(folderIconToggleButtonTapped))
-        folderIconBarButton.width = 32
+    // 设置按钮点击事件
+    @objc private func settingsButtonTapped() {
+        // 先隐藏编辑面板（如果显示）
+        if isEditMenuExpanded {
+            isEditMenuExpanded = false
+            editPanel.isHidden = true
+            editPanel.removeFromSuperview()
+        }
         
-        // 始终显示主题按钮，不受眼镜图标控制
-        let themeIconImage = UIImage(systemName: currentThemeMode.iconName)
-        let themeBarButton = UIBarButtonItem(image: themeIconImage, style: .plain, target: self, action: #selector(themeButtonTapped))
-        themeBarButton.width = 32
-        navigationItem.rightBarButtonItems = [folderIconBarButton, themeBarButton]
+        // 切换设置面板显示状态
+        isSettingsMenuExpanded.toggle()
+        
+        if isSettingsMenuExpanded {
+            // 显示设置面板
+            view.addSubview(settingsPanel)
+            
+            // 设置设置面板约束：紧贴导航栏下方，宽度根据内容自适应
+            NSLayoutConstraint.activate([
+                settingsPanel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                settingsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                settingsPanel.heightAnchor.constraint(equalToConstant: 128) // 调整高度以适应按钮和间距：16+44+8+44+16=128
+            ])
+            
+            // 更新设置面板中的按钮文本
+            if let folderIconButton = settingsPanel.subviews[0] as? UIButton {
+                folderIconButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
+            }
+            if let themeButton = settingsPanel.subviews[1] as? UIButton {
+                themeButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
+            }
+            
+            // 直接显示面板，无需动画
+            settingsPanel.alpha = 1
+            settingsPanel.transform = .identity
+            settingsPanel.isHidden = false
+        } else {
+            // 直接隐藏面板，无需动画
+            settingsPanel.isHidden = true
+            settingsPanel.removeFromSuperview()
+        }
+    }
+    
+    private func updateRightBarButtonsVisibility() {
+        // 创建设置按钮（使用齿轮图标）
+        let settingsIconImage = UIImage(systemName: "gearshape")
+        let settingsBarButton = UIBarButtonItem(image: settingsIconImage, style: .plain, target: self, action: #selector(settingsButtonTapped))
+        settingsBarButton.width = 32
+        navigationItem.rightBarButtonItems = [settingsBarButton]
     }
     
     // 主题切换按钮点击事件
@@ -874,6 +1077,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 保存主题设置
         saveThemeSetting()
+
+        // 更新设置面板中的按钮文字（无动画）
+        if let themeButton = settingsPanel.subviews[1] as? UIButton {
+            UIView.performWithoutAnimation {
+                themeButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
+                themeButton.layoutIfNeeded() // 确保立即刷新布局
+            }
+        }
     }
     
     // 应用主题
@@ -1134,7 +1345,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 启动更新计时器
     private func startUpdateTimer() {
         stopUpdateTimer() // 先停止之前的计时器
-        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
+        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
     }
     
     // 停止更新计时器
@@ -1250,7 +1461,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         present(alert, animated: true)
         
         // 扫描文件夹内容
-        scanner.scanDirectory(url, progressHandler: { _ in
+        scanner.scanDirectory(url, scanProgressHandler: { _ in
             // 进度更新可以在这里处理
         }, completionHandler: { [weak self] newRootItem in
             guard let self = self else { return }
@@ -1491,7 +1702,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     }
     
     // 更新进度
-    @objc private func updateProgress() {
+    @objc private func updatePlayProgress() {
         // 只有当播放器正在播放且用户不在拖动滑块时才更新UI
         if musicPlayer.isPlaying && !isSeeking {
             let progress = musicPlayer.currentTime / musicPlayer.totalTime

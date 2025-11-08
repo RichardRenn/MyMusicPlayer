@@ -30,9 +30,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     private let bottomBanner: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 与列表页保持一致的半透明背景
+        // view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
+        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = false
+        // 添加阴影效果
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOffset = CGSize(width: 0, height: -4)
+        view.layer.shadowRadius = 8
+        view.clipsToBounds = false
         return view
     }()
     
@@ -172,9 +179,6 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 根据波形图显示状态决定是否启用频谱分析
-        // 波形图功能已移除
-        print("[MusicPlayerViewController] 进入播放页，已根据波形图显示状态设置频谱分析")
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -192,9 +196,6 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        
-        // 移除通知监听
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
     }
     
     // 设置左滑手势
@@ -212,13 +213,10 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         }
     }
     
-    // 更新波形图显示状态
     deinit {
         stopUpdateTimer()
-        // 移除通知监听
         NotificationCenter.default.removeObserver(self, name: NSNotification.Name("PlayerStateChanged"), object: nil)
         NotificationCenter.default.removeObserver(self, name: .musicPlayerProgressChanged, object: nil)
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("FolderIconsVisibilityChanged"), object: nil)
     }
     
     // 设置UI
@@ -262,13 +260,15 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         bottomBanner.addSubview(allButtonsStack)
 
         // 为底部横幅添加悬浮样式和圆角
-        bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
-        // bottomBanner.layer.shadowColor = UIColor.black.cgColor // 阴影颜色为黑色。
-        // bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -2) // 阴影向上偏移 2 个点（height = -2），因为 banner 在底部，要让阴影“向上”显示
-        // bottomBanner.layer.shadowOpacity = 0.2 // 阴影不透明度为 0.1（很淡的阴影）
-        // bottomBanner.layer.shadowRadius = 1 // 阴影的模糊半径
-        // bottomBanner.layer.masksToBounds = false // 保留阴影。（如果设为 true，圆角之外的部分会被裁掉，阴影也会被剪掉，看不见了。）
-        bottomBanner.layer.cornerRadius = 24 // 让视图的角变圆，半径是 24
+        // bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
+        bottomBanner.backgroundColor = .systemBackground
+        // 添加阴影效果
+        bottomBanner.layer.shadowColor = UIColor.black.cgColor
+        bottomBanner.layer.shadowOpacity = 0.1
+        bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -4)
+        bottomBanner.layer.shadowRadius = 8
+        bottomBanner.clipsToBounds = false
+        bottomBanner.layer.cornerRadius = 12 // 让视图的角变圆，半径
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
         
         // 设置约束
@@ -468,7 +468,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     // 启动更新计时器
     private func startUpdateTimer() {
         stopUpdateTimer() // 先停止之前可能存在的计时器
-        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updateProgress), userInfo: nil, repeats: true)
+        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
     }
     
     // 停止更新计时器
@@ -488,12 +488,6 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         } else {
             songTitleLabel.text = music.title
         }
-        
-        // 更新波形图动画状态，同时受播放状态和showFolderIcons开关控制
-        let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
-        let shouldAnimate = musicPlayer.isPlaying && showWaveform
-        print("[MusicPlayerViewController] 更新波形图动画状态: \(shouldAnimate) (播放状态: \(musicPlayer.isPlaying), 显示开关: \(showWaveform))")
-
 
         // 根据当前播放状态更新播放/暂停按钮图标
         let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
@@ -532,11 +526,6 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             // 更新播放/暂停按钮
             let imageName = musicPlayer.isPlaying ? "pause.fill" : "play.fill"
             playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
-            
-            // 更新波形图动画状态，同时受播放状态和showFolderIcons开关控制
-            let showWaveform = UserDefaults.standard.bool(forKey: "showFolderIcons")
-            let shouldAnimate = musicPlayer.isPlaying && showWaveform
-            print("[MusicPlayerViewController] updatePlayerUI - 设置波形图动画状态: \(shouldAnimate) (播放状态: \(musicPlayer.isPlaying), 显示开关: \(showWaveform))")
             
             // 根据播放状态控制进度更新计时器
             if musicPlayer.isPlaying {
@@ -678,7 +667,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     }
     
     // 更新进度
-    @objc private func updateProgress() {
+    @objc private func updatePlayProgress() {
         // 只有当播放器正在播放且用户不在拖动滑块时才更新UI
         if musicPlayer.isPlaying && !isSeeking {
             let progress = musicPlayer.currentTime / musicPlayer.totalTime

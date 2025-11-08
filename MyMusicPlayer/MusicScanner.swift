@@ -5,13 +5,13 @@ class MusicScanner {
     let fileManager = FileManager.default
     
     // 扫描目录
-    func scanDirectory(_ url: URL, progressHandler: @escaping (Double) -> Void, completionHandler: @escaping (DirectoryItem?) -> Void) {
+    func scanDirectory(_ url: URL, scanProgressHandler: @escaping (Double) -> Void, completionHandler: @escaping (DirectoryItem?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             // 检查URL是否需要访问权限
             var hasAccess = true
             var shouldStopAccess = false
             var lastProgressUpdateTime: Date?
-            let minUpdateInterval: TimeInterval = 0.5 // 严格控制更新频率
+            let minUpdateInterval: TimeInterval = 0.1 // 严格控制更新频率
             
             // 如果URL是安全范围的资源，尝试请求访问权限
             if url.startAccessingSecurityScopedResource() {
@@ -25,7 +25,7 @@ class MusicScanner {
             
             // 先发送初始进度
             DispatchQueue.main.async {
-                progressHandler(0.0)
+                scanProgressHandler(0.0)
             }
             
             // 只有在有权限的情况下才扫描
@@ -133,7 +133,7 @@ class MusicScanner {
                                         let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
                                         lastProgressUpdateTime = currentTime
                                         DispatchQueue.main.async {
-                                            progressHandler(progress)
+                                            scanProgressHandler(progress)
                                         }
                                     } else if lastProgressUpdateTime == nil || 
                                               currentTime.timeIntervalSince(lastProgressUpdateTime!) >= minUpdateInterval {
@@ -141,7 +141,7 @@ class MusicScanner {
                                         let currentProgress = Double(processedFilesCount) / Double(totalFilesCount)
                                         lastProgressUpdateTime = currentTime
                                         DispatchQueue.main.async {
-                                            progressHandler(currentProgress)
+                                            scanProgressHandler(currentProgress)
                                         }
                                     }
                                 }
@@ -159,7 +159,7 @@ class MusicScanner {
                                     let progress = min(Double(processedFilesCount) / Double(totalFilesCount), 1.0)
                                     lastProgressUpdateTime = Date()
                                     DispatchQueue.main.async {
-                                        progressHandler(progress)
+                                        scanProgressHandler(progress)
                                     }
                                 }
                             }
@@ -188,7 +188,7 @@ class MusicScanner {
             
             // 确保最终进度为100%
             DispatchQueue.main.async {
-                progressHandler(1.0)
+                scanProgressHandler(1.0)
                 // 检查是否找到任何音乐文件或子目录，如果没有，则返回nil表示扫描无效
                 if directoryItem.musicFiles.isEmpty && directoryItem.subdirectories.isEmpty {
                     print("[MusicScanner] 未在目录中找到任何音乐文件或子目录")

@@ -26,7 +26,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "请选择一个包含音乐文件的文件夹"
+        // label.text = "请选择一个包含音乐文件的文件夹"
+        label.text = ""
         label.font = UIFont.systemFont(ofSize: 16)
         label.textAlignment = .center
         label.textColor = .secondaryLabel
@@ -314,7 +315,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                         
                         // 逐个扫描每个URL
                         for (index, url) in recoveredURLs.enumerated() {
-                            self.musicScanner.scanDirectory(url, progressHandler: { progress in
+                            self.musicScanner.scanDirectory(url, scanProgressHandler: { progress in
                                 print("[ViewController] [持久化] 扫描文件夹\(index+1)/\(totalScans) 进度: \(Int(progress * 100))%")
                                 
                                 // 更新进度条UI
@@ -441,7 +442,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
                                 }
                             
                             // 立即开始扫描
-                            self.musicScanner.scanDirectory(savedURL, progressHandler: { progress in
+                            self.musicScanner.scanDirectory(savedURL, scanProgressHandler: { progress in
                                 print("[ViewController] [持久化] 扫描进度: \(Int(progress * 100))%")
                                 
                                 // 更新进度条UI
@@ -601,7 +602,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         
         // 逐个扫描每个URL
         for (index, url) in grantedURLs.enumerated() {
-            self.musicScanner.scanDirectory(url, progressHandler: { progress in
+            self.musicScanner.scanDirectory(url, scanProgressHandler: { progress in
                 DispatchQueue.main.async {
                     let currentTime = Date()
                     // 只有在距离上次更新至少1秒时才更新UI
