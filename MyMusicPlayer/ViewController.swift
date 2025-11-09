@@ -109,8 +109,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     
     override func viewDidLoad() {
-        // 应用主题颜色到按钮
-        selectButton.backgroundColor = themeColor
         super.viewDidLoad()
         setupUI()
         // 添加按钮点击事件
@@ -119,6 +117,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         
         // 加载并应用保存的主题设置
         loadSavedTheme()
+        // 先加载主题颜色，再应用到按钮和进度条
+        themeColor = loadThemeColorSetting()
+        selectButton.backgroundColor = themeColor
+        progressView.progressTintColor = themeColor
         
         // 设置初始提示文本
         tipsLabel.text = tipsArray[0]
@@ -767,8 +769,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         
         // 重新加载主题颜色
         themeColor = loadThemeColorSetting()
-        // 应用主题颜色到按钮
+        // 应用主题颜色到按钮和进度条
         selectButton.backgroundColor = themeColor
+        progressView.progressTintColor = themeColor
         
         // 根据是否已选择过文件夹控制按钮和扫描提示的可见性
         selectButton.isHidden = hasSelectedDirectory

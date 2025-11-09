@@ -886,6 +886,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     private func updateLeftBarButtonsVisibility() {
         // 创建编辑按钮（使用pencil图标）
         let editButton = UIBarButtonItem(image: UIImage(systemName: "pencil"), style: .plain, target: self, action: #selector(editButtonTapped))
+        editButton.tintColor = themeColor
         
         // 只显示编辑按钮在导航栏左侧
         navigationItem.leftBarButtonItems = [editButton]
@@ -1094,6 +1095,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         // 创建设置按钮（使用齿轮图标）
         let settingsIconImage = UIImage(systemName: "gearshape")
         let settingsBarButton = UIBarButtonItem(image: settingsIconImage, style: .plain, target: self, action: #selector(settingsButtonTapped))
+        settingsBarButton.tintColor = themeColor
         settingsBarButton.width = 32
         navigationItem.rightBarButtonItems = [settingsBarButton]
     }
@@ -1108,6 +1110,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 应用新主题
         applyTheme()
+        
+        // 更新主题按钮文本
+        updateThemeColorUI()
         
         // 保存主题设置
         saveThemeSetting()
@@ -1151,6 +1156,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         progressSlider.setThumbImage(thumbImage, for: .normal)
         progressSlider.setThumbImage(thumbImage, for: .highlighted)
 
+        // 更新播放横幅中的按钮颜色
+        previousButton.tintColor = themeColor
+        playPauseButton.tintColor = themeColor
+        nextButton.tintColor = themeColor
+        playModeButton.tintColor = themeColor
+        rangeLockButton.tintColor = themeColor
+        expandButton.tintColor = themeColor
+        
         // 更新设置面板中的按钮文字（无动画）
         if let themeButton = settingsPanel.subviews[1] as? UIButton {
             UIView.performWithoutAnimation {
@@ -1158,6 +1171,24 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 themeButton.layoutIfNeeded() // 确保立即刷新布局
             }
         }
+        
+        // 更新设置面板中的所有按钮文字颜色
+        for subview in settingsPanel.subviews {
+            if let button = subview as? UIButton {
+                button.setTitleColor(themeColor, for: .normal)
+            }
+        }
+        
+        // 更新编辑面板中的所有按钮文字颜色
+        for subview in editPanel.subviews {
+            if let button = subview as? UIButton {
+                button.setTitleColor(themeColor, for: .normal)
+            }
+        }
+        
+        // 更新导航栏按钮颜色
+        updateLeftBarButtonsVisibility()
+        updateRightBarButtonsVisibility()
         
         // 刷新表格视图以更新播放中歌曲的高亮颜色
         tableView.reloadData()
@@ -1681,7 +1712,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             if !directory.subdirectories.isEmpty || !directory.musicFiles.isEmpty {
                 let imageName = directory.isExpanded ? "chevron.down" : "chevron.right"
                 cell.accessoryType = .none
-                cell.accessoryView = UIImageView(image: UIImage(systemName: imageName))
+                let imageView = UIImageView(image: UIImage(systemName: imageName))
+                imageView.tintColor = themeColor // 使用全局主题颜色
+                cell.accessoryView = imageView
             } else {
                 cell.accessoryView = nil
                 cell.accessoryType = .none
@@ -1693,11 +1726,13 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             var content = cell.defaultContentConfiguration()
             
             // 显示格式：歌曲名 - 艺术家
-            if musicFile.artist != "Unknown Artist" {
-                content.text = "\(musicFile.title) - \(musicFile.artist)"
-            } else {
-                content.text = musicFile.title
-            }
+            // if musicFile.artist != "Unknown Artist" {
+            //     content.text = "\(musicFile.title) - \(musicFile.artist)"
+            // } else {
+            //     content.text = musicFile.title
+            // }
+            // 显示格式：歌曲名
+            content.text = musicFile.title
             
             // 如果是当前播放的歌曲，高亮显示
             if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {

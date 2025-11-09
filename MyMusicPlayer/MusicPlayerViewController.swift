@@ -516,6 +516,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         progressSlider.setThumbImage(thumbImage, for: .normal)
         progressSlider.setThumbImage(thumbImage, for: .highlighted)
+
+        // 更新返回按钮颜色
+        navigationItem.leftBarButtonItem?.tintColor = themeColor
+        
+        // 更新播放横幅中的按钮颜色
+        previousButton.tintColor = themeColor
+        playPauseButton.tintColor = themeColor
+        nextButton.tintColor = themeColor
+        playModeButton.tintColor = themeColor
+        rangeLockButton.tintColor = themeColor
         
         // 更新歌词表格视图
         tableView.reloadData()
