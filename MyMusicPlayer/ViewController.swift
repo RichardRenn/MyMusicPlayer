@@ -39,7 +39,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         let button = UIButton(type: .system)
         button.setTitle("选择文件夹", for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
-        button.backgroundColor = .tintColor
+        button.backgroundColor = .systemBlue
         button.setTitleColor(.white, for: .normal)
         button.layer.cornerRadius = 10
         button.clipsToBounds = true

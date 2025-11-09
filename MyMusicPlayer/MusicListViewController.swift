@@ -49,8 +49,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 主题相关
     private var currentThemeMode: ThemeMode = .light
     
-    // 文件夹图标显示控制
-    private var showFolderIcons: Bool = true { 
+    // 全局图标显示控制
+    private var showIcons: Bool = true { 
         didSet {
             saveFolderIconSetting()
         }
@@ -84,11 +84,18 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 歌词面板
     private let lyricsPanel: UIView = {
         let view = UIView()
-        view.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.98) // 与底部横幅统一背景色
+        // view.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.98) // 与底部横幅统一背景色
+        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
-        view.layer.cornerRadius = 24
+        view.layer.cornerRadius = 12
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只设置顶部两个角为圆角
+        // 添加阴影效果
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOffset = CGSize(width: 0, height: -4)
+        view.layer.shadowRadius = 8
+        view.clipsToBounds = false
         return view
     }()
     
@@ -183,7 +190,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        slider.minimumTrackTintColor = .tintColor
+        slider.minimumTrackTintColor = .systemBlue
         slider.maximumTrackTintColor = .systemGray3
         
         // 设置滑块尺寸为14x14，形状为圆角矩形
@@ -197,7 +204,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
             
             // 填充内部，使用与进度条一致的颜色
-            ctx.setFillColor(UIColor.tintColor.cgColor)
+            ctx.setFillColor(UIColor.systemBlue.cgColor)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
@@ -833,10 +840,10 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         updateRangeLockButtonImage()
     }
     
-    // 切换文件夹图标显示状态的按钮点击事件
-    @objc private func folderIconToggleButtonTapped() {
+    // 切换全局图标显示状态的按钮点击事件
+    @objc private func showIconToggleButtonTapped() {
         // 切换显示状态
-        showFolderIcons.toggle()
+        showIcons.toggle()
         
         // 刷新表格视图
         tableView.reloadData()
@@ -846,22 +853,22 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         updateRightBarButtonsVisibility()
         
         // 更新设置面板中的按钮文字（无动画）
-        if let folderIconButton = settingsPanel.subviews.first as? UIButton {
+        if let showIconButton = settingsPanel.subviews.first as? UIButton {
             UIView.performWithoutAnimation {
-                folderIconButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
-                folderIconButton.layoutIfNeeded() // 确保立即刷新布局
+                showIconButton.setTitle(showIcons ? "隐藏图标" : "显示图标", for: .normal)
+                showIconButton.layoutIfNeeded() // 确保立即刷新布局
             }
         }
     }
     
-    // 保存文件夹图标设置
+    // 保存全局图标设置
     private func saveFolderIconSetting() {
-        UserDefaults.standard.set(showFolderIcons, forKey: "showFolderIcons")
+        UserDefaults.standard.set(showIcons, forKey: "showIcons")
     }
     
-    // 加载文件夹图标设置
+    // 加载全局图标设置
     private func loadFolderIconSetting() {
-        showFolderIcons = UserDefaults.standard.bool(forKey: "showFolderIcons")
+        showIcons = UserDefaults.standard.bool(forKey: "showIcons")
     }
     
     // 更新左侧导航栏按钮可见性
@@ -890,15 +897,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
         
-        // 文件夹图标切换按钮
-        let folderIconToggleButton = UIButton(type: .system)
-        folderIconToggleButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
-        folderIconToggleButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
-        folderIconToggleButton.titleLabel?.textAlignment = .right
-        folderIconToggleButton.contentHorizontalAlignment = .right
-        folderIconToggleButton.translatesAutoresizingMaskIntoConstraints = false
-        folderIconToggleButton.addTarget(self, action: #selector(folderIconToggleButtonTapped), for: .touchUpInside)
-        view.addSubview(folderIconToggleButton)
+        // 全局图标切换按钮
+        let showIconToggleButton = UIButton(type: .system)
+        showIconToggleButton.setTitle(showIcons ? "隐藏图标" : "显示图标", for: .normal)
+        showIconToggleButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        showIconToggleButton.titleLabel?.textAlignment = .right
+        showIconToggleButton.contentHorizontalAlignment = .right
+        showIconToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        showIconToggleButton.addTarget(self, action: #selector(showIconToggleButtonTapped), for: .touchUpInside)
+        view.addSubview(showIconToggleButton)
         
         // 主题切换按钮
         let themeToggleButton = UIButton(type: .system)
@@ -912,12 +919,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 设置约束
         NSLayoutConstraint.activate([
-            folderIconToggleButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
-            folderIconToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            folderIconToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            folderIconToggleButton.heightAnchor.constraint(equalToConstant: 44),
+            showIconToggleButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            showIconToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            showIconToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            showIconToggleButton.heightAnchor.constraint(equalToConstant: 44),
             
-            themeToggleButton.topAnchor.constraint(equalTo: folderIconToggleButton.bottomAnchor, constant: 8),
+            themeToggleButton.topAnchor.constraint(equalTo: showIconToggleButton.bottomAnchor, constant: 8),
             themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             themeToggleButton.heightAnchor.constraint(equalToConstant: 44),
@@ -1038,8 +1045,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             ])
             
             // 更新设置面板中的按钮文本
-            if let folderIconButton = settingsPanel.subviews[0] as? UIButton {
-                folderIconButton.setTitle(showFolderIcons ? "隐藏图标" : "显示图标", for: .normal)
+            if let showIconButton = settingsPanel.subviews[0] as? UIButton {
+                showIconButton.setTitle(showIcons ? "隐藏图标" : "显示图标", for: .normal)
             }
             if let themeButton = settingsPanel.subviews[1] as? UIButton {
                 themeButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
@@ -1562,7 +1569,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 当前播放的歌词行高亮显示
             if indexPath.row == currentLyricIndex {
                 content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
-                content.textProperties.color = .tintColor
+                content.textProperties.color = .systemBlue
             } else {
                 content.textProperties.font = UIFont.systemFont(ofSize: 16)
                 content.textProperties.color = .secondaryLabel
@@ -1621,7 +1628,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 如果是当前播放的歌曲，高亮显示
             if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {
                 content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
-                content.textProperties.color = .tintColor
+                content.textProperties.color = .systemBlue
             } else {
             content.textProperties.font = UIFont.systemFont(ofSize: 16)
             content.textProperties.color = .label
@@ -1635,23 +1642,17 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             let additionalIndent = 26
             cell.indentationWidth = CGFloat(baseIndent + additionalIndent * level) // 与目录项保持一致的缩进规则
             
-            // 根据showFolderIcons控制是否显示歌词图标
-            if showFolderIcons {
-                // 检查是否有歌词，根据歌词状态显示不同图标
-                if musicFile.lyricsURL != nil || !musicFile.lyrics.isEmpty {
-                    let lyricIcon = UIImageView(image: UIImage(systemName: "music.note"))
-                    lyricIcon.tintColor = .tintColor
-                    lyricIcon.contentMode = .scaleAspectFit
-                    lyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
-                    cell.accessoryView = lyricIcon
-                } else {
-                    // 使用更通用的图标表示无歌词状态
-                    let noLyricIcon = UIImageView(image: UIImage(systemName: "music.note.slash"))
-                    noLyricIcon.tintColor = .secondaryLabel
-                    noLyricIcon.contentMode = .scaleAspectFit
-                    noLyricIcon.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
-                    cell.accessoryView = noLyricIcon
-                }
+            // 根据showIcons控制是否显示歌词图标
+            if showIcons {
+                // 判断是否有歌词：有 lyricsURL 或歌词文本不为空
+                let hasLyrics = (musicFile.lyricsURL != nil) || !musicFile.lyrics.isEmpty
+                let imageName = hasLyrics ? "music.note" : "music.note.slash"
+                let tintColor: UIColor = hasLyrics ? .systemBlue : .secondaryLabel
+                let iconView = UIImageView(image: UIImage(systemName: imageName))
+                iconView.tintColor = tintColor
+                iconView.contentMode = .scaleAspectFit
+                iconView.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
+                cell.accessoryView = iconView
             } else {
                 cell.accessoryView = nil // 不显示任何图标
             }

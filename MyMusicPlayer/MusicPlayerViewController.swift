@@ -57,7 +57,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
         label.textAlignment = .left
-        // 初始状态将根据showFolderIcons设置决定，在viewWillAppear中通过updateWaveformVisibility方法更新
+        // 初始状态将根据showIcons设置决定，在viewWillAppear中通过updateWaveformVisibility方法更新
         return label
     }()
     
@@ -66,9 +66,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.minimumValue = 0.0
         slider.maximumValue = 1.0
-        // 根据设备型号设置不同颜色
-        let isiPhone13Mini = UIScreen.main.bounds.size == CGSize(width: 375, height: 812) && UIDevice.current.userInterfaceIdiom == .phone
-        slider.minimumTrackTintColor = isiPhone13Mini ? .systemBlue : .tintColor
+        slider.minimumTrackTintColor = .systemBlue
         slider.maximumTrackTintColor = .systemGray3
         
         // 设置滑块尺寸为14x14，形状为圆角矩形
@@ -82,7 +80,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
             
             // 填充内部，使用与进度条一致的颜色
-            ctx.setFillColor(isiPhone13Mini ? UIColor.systemBlue.cgColor : UIColor.tintColor.cgColor)
+            ctx.setFillColor(UIColor.systemBlue.cgColor)
             ctx.addPath(path.cgPath)
             ctx.fillPath()
         }
@@ -734,7 +732,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 当前播放的歌词行高亮显示
         if indexPath.row == currentLyricIndex {
             content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
-            content.textProperties.color = .tintColor
+            content.textProperties.color = .systemBlue
         } else {
             content.textProperties.font = UIFont.systemFont(ofSize: 16)
             content.textProperties.color = .secondaryLabel
