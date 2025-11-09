@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import MediaPlayer
+import UIKit
 
 class DirectoryItem: Equatable {
     let url: URL?
@@ -115,22 +116,27 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         print("[MusicPlayer] 音频播放器初始化成功")
     }
     
+    // 设置远程控制命令中心
+    // 远程控制命令中心的配置已移至AppDelegate.swift中实现
+    // 避免重复设置导致的冲突问题
+    
     // 设置音频会话
     private func setupAudioSession() {
         do {
-            // 简化音频会话配置，避免参数错误
+            print("[MusicPlayer] 开始配置音频会话")
             let session = AVAudioSession.sharedInstance()
             
             // 先尝试停用现有的音频会话
             try? session.setActive(false, options: .notifyOthersOnDeactivation)
             
-            // 确保正确设置类别和模式
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-
-            // 延迟激活会话，在实际需要播放时再激活
-            // 这样可以避免在应用启动时就占用音频设备
+            // 为控制中心显示和后台播放配置音频会话
+            // 移除.mixWithOthers选项，使用更标准的配置
+            try session.setCategory(.playback, mode: .default, options: [])
             
-            print("[MusicPlayer] 音频会话配置成功")
+            // 立即激活会话，确保控制中心能正确识别
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            print("[MusicPlayer] 音频会话成功激活")
+            
         } catch {
             print("[MusicPlayer] 音频会话设置失败: \(error)")
             // 错误2003332927通常表示Core Audio设备属性访问问题，记录详细信息便于调试
@@ -144,12 +150,20 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     // 确保应用成为活动的媒体播放器
     private func becomeActiveMediaPlayer() {
         do {
-            // 使用相同的安全参数激活音频会话
+            print("[MusicPlayer] 尝试成为活动媒体播放器")
             let session = AVAudioSession.sharedInstance()
             
-            // 直接尝试激活会话，系统会自动处理重复激活的情况
+            // 直接尝试激活会话，不再检查isActive属性
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             print("[MusicPlayer] 音频会话已激活")
+            
+            // 远程控制接收者设置已移至AppDelegate
+            
+            // 强制更新一次Now Playing信息
+            DispatchQueue.main.async {
+                self.updateNowPlayingInfo()
+            }
+            
         } catch {
             print("[MusicPlayer] 无法激活音频会话: \(error)")
             // 记录AQMEIO_HAL相关错误信息
@@ -255,6 +269,13 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     // 播放音频文件
     private func playAudio(_ url: URL) {
+        // 防御性检查
+        if !FileManager.default.fileExists(atPath: url.path) {
+            print("[MusicPlayer] 警告: 文件不存在: \(url.path)")
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            return
+        }
+        
         // 尝试获取文件访问权限
         var shouldStopAccess = false
         if url.startAccessingSecurityScopedResource() {
@@ -271,32 +292,53 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
             
-            // 设置音频会话
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-            
-            // 开始播放
-            audioPlayer?.play()
-            isPlaying = true
-            totalTime = audioPlayer?.duration ?? 0
-            
-            // 启动进度更新计时器
-            startProgressTimer()
-            
-            // 立即更新Now Playing信息
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.updateNowPlayingInfo()
+            // 尝试播放
+            if let audioPlayer = audioPlayer, audioPlayer.prepareToPlay() {
+                // 确保在播放前激活音频会话
+                becomeActiveMediaPlayer()
+                
+                // 实际播放音频
+                audioPlayer.play()
+                isPlaying = true
+                totalTime = audioPlayer.duration
+                currentTime = 0
+                
+                // 启动进度更新计时器
+                startProgressTimer()
+                
+                // 立即更新控制中心信息
+                updateNowPlayingInfo()
+                
+                // 记录成功播放的日志
+                print("[MusicPlayer] 开始播放: \(currentMusic?.title ?? "未知歌曲")")
+            } else {
+                // 准备播放失败的处理
+                print("[MusicPlayer] 准备播放失败: \(url.lastPathComponent)")
+                isPlaying = false
+                // 播放失败时清除控制中心信息
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             }
         } catch {
+            // 错误处理
             print("[MusicPlayer] 播放音乐失败: \(error)")
             isPlaying = false
+            
+            // 播放失败时清除控制中心信息
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             
             // 如果播放失败，释放访问权限
             if shouldStopAccess {
                 url.stopAccessingSecurityScopedResource()
                 // 从跟踪列表中移除
                 securityScopedResources.removeAll { $0 == url }
+            }
+            
+            // 尝试清除播放器并准备重新创建
+            audioPlayer = nil
+            
+            // 针对某些特定错误进行重试逻辑
+            if (error as NSError).domain == NSOSStatusErrorDomain {
+                print("[MusicPlayer] Core Audio错误: \((error as NSError).code)")
             }
         }
     }
@@ -364,11 +406,6 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             info[MPMediaItemPropertyAlbumTrackCount] = totalTracks
         }
         
-        // 可以根据需要添加更多信息，如：
-        // - 音频格式信息
-        // - 歌词可用性信息
-        // - 自定义信息
-        
         // 确保在主线程更新控制中心信息
         DispatchQueue.main.async {
             // 复制变量到闭包内部，避免作用域问题
@@ -377,8 +414,9 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // 直接更新Now Playing信息，不清除旧信息，避免闪烁
             MPNowPlayingInfoCenter.default().nowPlayingInfo = localInfo
             
-            // 验证设置后的信息，如有失败则重试
-            if MPNowPlayingInfoCenter.default().nowPlayingInfo == nil {
+            // 验证设置后的信息
+            let updatedInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo
+            if updatedInfo == nil {
                 // 重试一次，这次先清除再设置
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nil

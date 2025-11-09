@@ -18,6 +18,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func setupRemoteCommandCenter() {
         print("[AppDelegate] 设置MPRemoteCommandCenter")
         
+        // 设置应用为活动的远程控制接收者
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        print("[AppDelegate] 已开始接收远程控制事件")
+        
         let commandCenter = MPRemoteCommandCenter.shared()
         
         // 播放/暂停命令
