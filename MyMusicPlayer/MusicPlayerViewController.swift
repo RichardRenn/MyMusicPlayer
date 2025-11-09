@@ -16,6 +16,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     private var lyrics: [LyricsLine] = []
     private var currentLyricIndex: Int = 0
     
+    // 主题颜色属性
+    private var themeColor: UIColor {
+        // 从UserDefaults加载主题颜色
+        if let colorData = UserDefaults.standard.data(forKey: "themeColor"),
+           let color = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(colorData) as? UIColor {
+            return color
+        }
+        return .systemBlue // 默认颜色
+    }
+    
     // UI元素
     
     private let tableView: UITableView = {
@@ -173,10 +183,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         
         // 添加左滑手势支持返回功能
         setupSwipeGesture()
+        
+        // 更新UI以使用主题颜色
+        updateThemeColorUI()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
+        // 更新UI以使用主题颜色
+        updateThemeColorUI()
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -478,6 +494,33 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     private var isSeeking = false // 标记是否正在手动拖动滑块
     
     // 更新UI
+    private func updateThemeColorUI() {
+        // 更新进度滑块颜色
+        progressSlider.minimumTrackTintColor = themeColor
+        
+        // 重新创建滑块缩略图以更新颜色
+        let thumbSize = CGSize(width: 14, height: 14)
+        let cornerRadius: CGFloat = 4.5
+        let thumbImage = UIGraphicsImageRenderer(size: thumbSize).image { context in
+            let ctx = context.cgContext
+            
+            // 创建圆角矩形路径
+            let rect = CGRect(x: 0, y: 0, width: thumbSize.width, height: thumbSize.height)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
+            
+            // 填充内部，使用与进度条一致的颜色
+            ctx.setFillColor(themeColor.cgColor)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
+        }
+        
+        progressSlider.setThumbImage(thumbImage, for: .normal)
+        progressSlider.setThumbImage(thumbImage, for: .highlighted)
+        
+        // 更新歌词表格视图
+        tableView.reloadData()
+    }
+    
     private func updateUI() {
         
         // 设置歌曲标题标签的初始文本（虽然默认隐藏）
@@ -732,7 +775,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 当前播放的歌词行高亮显示
         if indexPath.row == currentLyricIndex {
             content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
-            content.textProperties.color = .systemBlue
+            content.textProperties.color = themeColor
         } else {
             content.textProperties.font = UIFont.systemFont(ofSize: 16)
             content.textProperties.color = .secondaryLabel

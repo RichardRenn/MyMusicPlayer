@@ -30,7 +30,7 @@ enum ThemeMode: Int, Codable {
     }
 }
 
-class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate {
+class MusicListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UIDocumentPickerDelegate, UIColorPickerViewControllerDelegate {
     
     private var rootDirectoryItems: [DirectoryItem] = [] // 修改为支持多个根目录
     private var scanner: MusicScanner
@@ -48,6 +48,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     
     // 主题相关
     private var currentThemeMode: ThemeMode = .light
+    
+    // 主题颜色设置
+    private var themeColor: UIColor = .systemBlue { 
+        didSet {
+            saveThemeColorSetting()
+            updateThemeColorUI()
+        }
+    }
     
     // 全局图标显示控制
     private var showIcons: Bool = true { 
@@ -267,6 +275,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 监听从歌词详情页返回的通知
         NotificationCenter.default.addObserver(self, selector: #selector(handleMusicPlayerReturn), name: NSNotification.Name("MusicPlayerReturned"), object: nil)
+        
+        // 加载主题颜色设置
+        loadThemeColorSetting()
     }
     
     // 注册应用生命周期通知
@@ -917,18 +928,34 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         themeToggleButton.addTarget(self, action: #selector(themeButtonTapped), for: .touchUpInside)
         view.addSubview(themeToggleButton)
         
+        // 颜色调整按钮
+        let colorAdjustButton = UIButton(type: .system)
+        colorAdjustButton.setTitle("颜色调整", for: .normal)
+        colorAdjustButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
+        colorAdjustButton.titleLabel?.textAlignment = .right
+        colorAdjustButton.contentHorizontalAlignment = .right
+        colorAdjustButton.translatesAutoresizingMaskIntoConstraints = false
+        colorAdjustButton.addTarget(self, action: #selector(colorAdjustButtonTapped), for: .touchUpInside)
+        view.addSubview(colorAdjustButton)
+        
         // 设置约束
         NSLayoutConstraint.activate([
             showIconToggleButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
             showIconToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             showIconToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            showIconToggleButton.heightAnchor.constraint(equalToConstant: 44),
+            showIconToggleButton.heightAnchor.constraint(equalToConstant: 40),
             
             themeToggleButton.topAnchor.constraint(equalTo: showIconToggleButton.bottomAnchor, constant: 8),
-            themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            themeToggleButton.heightAnchor.constraint(equalToConstant: 44),
-            themeToggleButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
+             themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+             themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+             themeToggleButton.heightAnchor.constraint(equalToConstant: 40),
+             
+             // 颜色调整按钮约束
+             colorAdjustButton.topAnchor.constraint(equalTo: themeToggleButton.bottomAnchor, constant: 8),
+             colorAdjustButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+             colorAdjustButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+             colorAdjustButton.heightAnchor.constraint(equalToConstant: 40),
+             colorAdjustButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
         ])
         
         return view
@@ -974,12 +1001,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             addFolderButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
             addFolderButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             addFolderButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            addFolderButton.heightAnchor.constraint(equalToConstant: 44),
+            addFolderButton.heightAnchor.constraint(equalToConstant: 40),
             
             refreshButton.topAnchor.constraint(equalTo: addFolderButton.bottomAnchor, constant: 8),
             refreshButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             refreshButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            refreshButton.heightAnchor.constraint(equalToConstant: 44),
+            refreshButton.heightAnchor.constraint(equalToConstant: 40),
             refreshButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
         ])
         
@@ -1006,7 +1033,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             NSLayoutConstraint.activate([
                 editPanel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
                 editPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                editPanel.heightAnchor.constraint(equalToConstant: 128) // 固定高度，包含两个按钮和间距
+                editPanel.heightAnchor.constraint(equalToConstant: 120) // 固定高度，包含两个按钮和间距：16+40+8+40+16=120
             ])
             
             // 直接显示面板，无需动画
@@ -1041,7 +1068,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             NSLayoutConstraint.activate([
                 settingsPanel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
                 settingsPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                settingsPanel.heightAnchor.constraint(equalToConstant: 128) // 调整高度以适应按钮和间距：16+44+8+44+16=128
+                settingsPanel.heightAnchor.constraint(equalToConstant: 168) // 调整高度以适应按钮和间距：16+40+8+40+8+40+16=168
             ])
             
             // 更新设置面板中的按钮文本
@@ -1084,6 +1111,45 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 保存主题设置
         saveThemeSetting()
+    }
+    
+    @objc private func colorAdjustButtonTapped() {
+        let colorPicker = UIColorPickerViewController()
+        colorPicker.selectedColor = themeColor
+        colorPicker.delegate = self
+        present(colorPicker, animated: true, completion: nil)
+    }
+    
+    private func saveThemeColorSetting() {
+        if let colorData = try? NSKeyedArchiver.archivedData(withRootObject: themeColor, requiringSecureCoding: false) {
+            UserDefaults.standard.set(colorData, forKey: "themeColor")
+        }
+    }
+    
+    private func loadThemeColorSetting() {
+        if let colorData = UserDefaults.standard.data(forKey: "themeColor"),
+           let savedColor = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(colorData) as? UIColor {
+            themeColor = savedColor
+        }
+    }
+    
+    private func updateThemeColorUI() {
+        // 更新进度滑块颜色
+        progressSlider.minimumTrackTintColor = themeColor
+        
+        // 更新滑块缩略图颜色
+        let thumbSize = CGSize(width: 14, height: 14)
+        let cornerRadius: CGFloat = 4.5
+        let thumbImage = UIGraphicsImageRenderer(size: thumbSize).image { context in
+            let ctx = context.cgContext
+            let rect = CGRect(x: 0, y: 0, width: thumbSize.width, height: thumbSize.height)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: cornerRadius)
+            ctx.setFillColor(themeColor.cgColor)
+            ctx.addPath(path.cgPath)
+            ctx.fillPath()
+        }
+        progressSlider.setThumbImage(thumbImage, for: .normal)
+        progressSlider.setThumbImage(thumbImage, for: .highlighted)
 
         // 更新设置面板中的按钮文字（无动画）
         if let themeButton = settingsPanel.subviews[1] as? UIButton {
@@ -1091,6 +1157,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 themeButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
                 themeButton.layoutIfNeeded() // 确保立即刷新布局
             }
+        }
+        
+        // 刷新表格视图以更新播放中歌曲的高亮颜色
+        tableView.reloadData()
+        
+        // 刷新歌词表格视图以更新高亮颜色
+        if isLyricsExpanded {
+            lyricsTableView.reloadData()
         }
     }
     
@@ -1569,7 +1643,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 当前播放的歌词行高亮显示
             if indexPath.row == currentLyricIndex {
                 content.textProperties.font = UIFont.systemFont(ofSize: 18, weight: .bold)
-                content.textProperties.color = .systemBlue
+                content.textProperties.color = themeColor
             } else {
                 content.textProperties.font = UIFont.systemFont(ofSize: 16)
                 content.textProperties.color = .secondaryLabel
@@ -1628,7 +1702,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             // 如果是当前播放的歌曲，高亮显示
             if let currentMusic = musicPlayer.currentMusic, currentMusic.url == musicFile.url {
                 content.textProperties.font = UIFont.boldSystemFont(ofSize: 16)
-                content.textProperties.color = .systemBlue
+                content.textProperties.color = themeColor
             } else {
             content.textProperties.font = UIFont.systemFont(ofSize: 16)
             content.textProperties.color = .label
@@ -1647,7 +1721,7 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 // 判断是否有歌词：有 lyricsURL 或歌词文本不为空
                 let hasLyrics = (musicFile.lyricsURL != nil) || !musicFile.lyrics.isEmpty
                 let imageName = hasLyrics ? "music.note" : "music.note.slash"
-                let tintColor: UIColor = hasLyrics ? .systemBlue : .secondaryLabel
+                let tintColor: UIColor = hasLyrics ? themeColor : .secondaryLabel
                 let iconView = UIImageView(image: UIImage(systemName: imageName))
                 iconView.tintColor = tintColor
                 iconView.contentMode = .scaleAspectFit
@@ -1864,5 +1938,14 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 自定义删除按钮标题
     func tableView(_ tableView: UITableView, titleForDeleteConfirmationButtonForRowAt indexPath: IndexPath) -> String? {
         return "删除"
+    }
+    
+    // MARK: - UIColorPickerViewControllerDelegate methods
+    func colorPickerViewControllerDidSelectColor(_ viewController: UIColorPickerViewController) {
+        themeColor = viewController.selectedColor
+    }
+    
+    func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+        // 颜色选择完成，已在didSelectColor中更新
     }
 }

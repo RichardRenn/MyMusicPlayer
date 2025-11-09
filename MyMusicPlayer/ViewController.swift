@@ -15,6 +15,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     private var hasSelectedDirectory = false // 跟踪是否已选择过文件夹
     
     // UI元素
+    // 主题颜色，默认为.systemBlue，在viewDidLoad中加载保存的设置
+    private var themeColor: UIColor = .systemBlue
+    
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.text = "欢迎使用本地音乐播放器"
@@ -106,6 +109,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     
     override func viewDidLoad() {
+        // 应用主题颜色到按钮
+        selectButton.backgroundColor = themeColor
         super.viewDidLoad()
         setupUI()
         // 添加按钮点击事件
@@ -165,6 +170,17 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     }
     
     // 加载保存的主题设置
+    // 从UserDefaults加载主题颜色设置
+    private func loadThemeColorSetting() -> UIColor {
+        let userDefaults = UserDefaults.standard
+        if let colorData = userDefaults.data(forKey: "themeColor") {
+            if let color = try? NSKeyedUnarchiver.unarchivedObject(ofClass: UIColor.self, from: colorData) {
+                return color
+            }
+        }
+        return .systemBlue
+    }
+    
     private func loadSavedTheme() {
         let defaults = UserDefaults.standard
         let themeKey = "themeMode"
@@ -535,6 +551,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             tipsLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -100),
             tipsLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 30) // 确保有足够高度显示文本
         ])
+        
+        // 应用主题颜色到按钮
+        selectButton.backgroundColor = themeColor
     }
     
     // 选择文件夹按钮点击事件
@@ -745,6 +764,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
+        // 重新加载主题颜色
+        themeColor = loadThemeColorSetting()
+        // 应用主题颜色到按钮
+        selectButton.backgroundColor = themeColor
+        
         // 根据是否已选择过文件夹控制按钮和扫描提示的可见性
         selectButton.isHidden = hasSelectedDirectory
         // subtitleLabel.isHidden = hasSelectedDirectory
