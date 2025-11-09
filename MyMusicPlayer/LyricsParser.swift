@@ -145,14 +145,25 @@ class LyricsParser {
     
     // 根据当前播放时间获取应该显示的歌词行索引
     static func getCurrentLyricIndex(time: TimeInterval, lyrics: [LyricsLine]) -> Int {
+        // 直接返回匹配当前时间的歌词索引
         for (index, lyric) in lyrics.enumerated() {
-            if time < lyric.time {
-                // 当前时间小于下一行歌词的时间，返回上一行的索引
-                return max(0, index - 1)
+            // 当时间超过当前歌词的时间，且没有达到下一行歌词时间时，显示当前行
+            // 这样可以确保歌词能够更及时地高亮显示
+            if time >= lyric.time {
+                // 检查是否有下一行歌词
+                if index + 1 < lyrics.count {
+                    // 如果有下一行，且当前时间小于下一行的时间，返回当前索引
+                    if time < lyrics[index + 1].time {
+                        return index
+                    }
+                } else {
+                    // 如果是最后一行，直接返回
+                    return index
+                }
             }
         }
         
-        // 如果没有找到合适的索引，返回最后一行
-        return lyrics.count - 1
+        // 如果没有找到合适的索引（通常是时间在第一行之前），返回第一行
+        return 0
     }
 }

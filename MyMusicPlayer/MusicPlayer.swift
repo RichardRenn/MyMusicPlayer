@@ -349,7 +349,7 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         stopProgressTimer()
         
         // 创建新的计时器
-        progressTimer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
+        progressTimer = Timer.scheduledTimer(timeInterval: 0.25, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
     }
     
     // 停止进度更新计时器

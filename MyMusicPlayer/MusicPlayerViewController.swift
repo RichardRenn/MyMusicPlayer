@@ -482,7 +482,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     // 启动更新计时器
     private func startUpdateTimer() {
         stopUpdateTimer() // 先停止之前可能存在的计时器
-        updateTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
+        updateTimer = Timer.scheduledTimer(timeInterval: 0.25, target: self, selector: #selector(updatePlayProgress), userInfo: nil, repeats: true)
     }
     
     // 停止更新计时器
