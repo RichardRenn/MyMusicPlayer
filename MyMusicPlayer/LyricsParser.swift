@@ -68,9 +68,9 @@ class LyricsParser {
         
         // 按行分割歌词
         let lines = content.components(separatedBy: .newlines)
-        print("[LyricsParser] 歌词文件共有 \(lines.count) 行")
+        // print("[LyricsParser] 歌词文件共有 \(lines.count) 行")
         
-        // 正则表达式匹配时间标签，支持两位数或三位数的毫秒部分
+        // 正则表达式匹配时间标签，支持任意位数的毫秒部分
         let timeRegex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d+)\\]")
         
         for line in lines {
@@ -109,7 +109,7 @@ class LyricsParser {
             
             // 如果文本为空，跳过这行
             if text.isEmpty {
-                // print("跳过空歌词行")
+                 print("跳过空歌词行")
                 continue
             }
             
@@ -125,8 +125,13 @@ class LyricsParser {
                     let second = Double(trimmedLine[secondRange]) ?? 0
                     let millisecond = Double(trimmedLine[millisecondRange]) ?? 0
                     
-                    // 转换为总秒数，根据毫秒位数进行不同处理
-                    let totalSeconds = minute * 60 + second + millisecond / (millisecond > 99 ? 1000 : 100)
+                    // 转换为总秒数，统一将毫秒部分除以1000，确保正确性
+                    // 对于任意位数的毫秒部分，我们统一将其视为千分位精度
+                    let millisecondStr = String(trimmedLine[millisecondRange])
+                    // 确保毫秒部分是3位，如果少于3位则补0，如果多于3位则截断
+                    let normalizedMillisecondStr = String(millisecondStr.prefix(3).padding(toLength: 3, withPad: "0", startingAt: 0))
+                    let normalizedMillisecond = Double(normalizedMillisecondStr) ?? 0.0
+                    let totalSeconds = minute * 60 + second + normalizedMillisecond / 1000.0
                     
                     lyrics.append(LyricsLine(time: totalSeconds, text: text))
                     // print("添加歌词行: [\(String(format: "%.3f", totalSeconds))] \(text)")
