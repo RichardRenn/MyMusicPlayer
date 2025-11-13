@@ -1,8 +1,11 @@
 import Foundation
 import AVFoundation
+import UIKit
 
 class MusicScanner {
     let fileManager = FileManager.default
+    
+
     
     // 扫描目录
     func scanDirectory(_ url: URL, scanProgressHandler: @escaping (Double) -> Void, completionHandler: @escaping (DirectoryItem?) -> Void) {
@@ -11,13 +14,22 @@ class MusicScanner {
             var hasAccess = true
             var shouldStopAccess = false
             var lastProgressUpdateTime: Date?
-            let minUpdateInterval: TimeInterval = 0.1 // 严格控制更新频率
-            
-            // 如果URL是安全范围的资源，尝试请求访问权限
-            if url.startAccessingSecurityScopedResource() {
-                shouldStopAccess = true
+            let minUpdateInterval: TimeInterval = 0.02 // 控制扫描进度更新频率
+
+            // 检查是否是APP专用文件夹
+            if FileUtils.isURLInAppSandbox(url) {
+                // APP专用文件夹，无需获取临时权限
+                print("[MusicScanner] 扫描APP专用文件夹: \(url.lastPathComponent)")
                 hasAccess = true
-                print("[MusicScanner] 成功获取目录访问权限: \(url.lastPathComponent)")
+            } else {
+                // 外部文件夹，需要获取临时权限
+                print("[MusicScanner] 扫描外部文件夹: \(url.lastPathComponent)")
+                // 如果URL是安全范围的资源，尝试请求访问权限
+                if url.startAccessingSecurityScopedResource() {
+                    shouldStopAccess = true
+                    hasAccess = true
+                    print("[MusicScanner] 成功获取目录访问权限: \(url.lastPathComponent)")
+                }
             }
             
             let directoryName = url.lastPathComponent
@@ -40,7 +52,7 @@ class MusicScanner {
                     
                     do {
                         var shouldStopItemAccess = false
-                        if directoryURL.startAccessingSecurityScopedResource() {
+                        if !FileUtils.isURLInAppSandbox(directoryURL) && directoryURL.startAccessingSecurityScopedResource() {
                             shouldStopItemAccess = true
                         }
                         
@@ -75,7 +87,7 @@ class MusicScanner {
                 // 实际扫描并更新进度
                 func scanWithProgress(_ url: URL, parentItem: DirectoryItem) {
                     var shouldStopItemAccess = false
-                    if url.startAccessingSecurityScopedResource() {
+                    if !FileUtils.isURLInAppSandbox(url) && url.startAccessingSecurityScopedResource() {
                         shouldStopItemAccess = true
                     }
                     
@@ -85,7 +97,7 @@ class MusicScanner {
                         for itemURL in contents {
                             do {
                                 var itemShouldStopAccess = false
-                                if itemURL.startAccessingSecurityScopedResource() {
+                                if !FileUtils.isURLInAppSandbox(itemURL) && itemURL.startAccessingSecurityScopedResource() {
                                     itemShouldStopAccess = true
                                 }
                                 
@@ -124,7 +136,7 @@ class MusicScanner {
                                 // 更新处理的文件数
                                 processedFilesCount += 1
                                 
-                                // 使用时间戳精确控制进度更新频率，每秒最多1次
+                                // 控制扫描进度更新频率
                                 if totalFilesCount > 0 {
                                     let currentTime = Date()
                                     // 只有在完成时或距离上次更新至少1秒时才更新
@@ -206,7 +218,7 @@ class MusicScanner {
         var shouldStopAccess = false
         
         // 如果URL是安全范围的资源，尝试请求访问权限
-        if url.startAccessingSecurityScopedResource() {
+        if !FileUtils.isURLInAppSandbox(url) && url.startAccessingSecurityScopedResource() {
             shouldStopAccess = true
             print("[MusicScanner] 成功获取子目录访问权限: \(url.lastPathComponent)")
         }
@@ -218,7 +230,7 @@ class MusicScanner {
                 do {
                     // 尝试对每个项目单独请求访问权限
                     var itemShouldStopAccess = false
-                    if itemURL.startAccessingSecurityScopedResource() {
+                    if !FileUtils.isURLInAppSandbox(itemURL) && itemURL.startAccessingSecurityScopedResource() {
                         itemShouldStopAccess = true
                     }
                     
@@ -272,8 +284,16 @@ class MusicScanner {
     }
     
     // 检查是否为音频文件
-    private func isAudioFile(_ url: URL) -> Bool {
-        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac"]
+    internal func isAudioFile(_ url: URL) -> Bool {
+        let audioExtensions = [
+            "m4a",    // AAC 音频（Apple 推荐格式）
+            "mp3",    // MPEG Layer 3
+            "wav",    // 未压缩 PCM
+            "aiff",   // Apple 未压缩格式
+            "aif",    // AIFF 缩写
+            "aifc",   // 压缩的 AIFF
+            "caf"     // Core Audio Format
+        ]
         let fileExtension = url.pathExtension.lowercased()
         return audioExtensions.contains(fileExtension)
     }
@@ -300,7 +320,7 @@ class MusicScanner {
             
             // 尝试获取访问权限
             var shouldStopAccess = false
-            let hasAccess = possibleURL.startAccessingSecurityScopedResource()
+            let hasAccess = !FileUtils.isURLInAppSandbox(possibleURL) && possibleURL.startAccessingSecurityScopedResource()
             
             if hasAccess {
                 shouldStopAccess = true
@@ -323,7 +343,7 @@ class MusicScanner {
         do {
             // 尝试获取目录访问权限
             var shouldStopAccess = false
-            if directory.startAccessingSecurityScopedResource() {
+            if !FileUtils.isURLInAppSandbox(directory) && directory.startAccessingSecurityScopedResource() {
                 shouldStopAccess = true
             }
             

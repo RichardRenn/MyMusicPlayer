@@ -403,6 +403,7 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     // 频谱数据回调功能已移除
     
     // 加载歌词
+    
     private func loadLyrics() {
         print("[MusicPlayerViewController] ===== 开始加载歌词 =====")
         // 清空之前的歌词
@@ -427,11 +428,16 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
             
             // 为歌词加载添加访问权限处理
             var shouldStopAccess = false
-            if lyricsURL.startAccessingSecurityScopedResource() {
-                shouldStopAccess = true
-                print("[MusicPlayerViewController] 成功获取歌词文件临时访问权限")
+            // 只有当文件不在APP沙盒目录时才需要获取访问权限
+            if !FileUtils.isURLInAppSandbox(lyricsURL) {
+                if lyricsURL.startAccessingSecurityScopedResource() {
+                    shouldStopAccess = true
+                    print("[MusicPlayerViewController] 成功获取歌词文件临时访问权限")
+                } else {
+                    print("[MusicPlayerViewController] 未能获取歌词文件临时访问权限")
+                }
             } else {
-                print("[MusicPlayerViewController] 未能获取歌词文件临时访问权限")
+                print("[MusicPlayerViewController] 文件在APP沙盒目录中，无需获取访问权限")
             }
             
             // 尝试解析歌词

@@ -70,6 +70,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- 支持文件共享功能 -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<!-- 支持在"我的iPhone"下直接访问应用文档 -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<!-- 支持深色模式设置 -->
 	<key>UIUserInterfaceStyle</key>
 	<string>Automatic</string>

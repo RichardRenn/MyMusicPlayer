@@ -267,6 +267,8 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     // 用于跟踪需要保持访问权限的资源
     private var securityScopedResources: [URL] = []
     
+
+    
     // 播放音频文件
     private func playAudio(_ url: URL) {
         // 防御性检查
@@ -276,9 +278,11 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             return
         }
         
-        // 尝试获取文件访问权限
+        // 尝试获取文件访问权限，只有当文件不在APP沙盒目录中时才需要
         var shouldStopAccess = false
-        if url.startAccessingSecurityScopedResource() {
+        if FileUtils.isURLInAppSandbox(url) {
+            print("[MusicPlayer] 文件在APP专用目录中，无需获取访问权限: \(url.lastPathComponent)")
+        } else if url.startAccessingSecurityScopedResource() {
             shouldStopAccess = true
             securityScopedResources.append(url)
             print("[MusicPlayer] 成功获取音频文件访问权限: \(url.lastPathComponent)")
@@ -326,7 +330,7 @@ class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             // 播放失败时清除控制中心信息
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             
-            // 如果播放失败，释放访问权限
+            // 如果播放失败，只在文件需要访问权限时释放访问权限
             if shouldStopAccess {
                 url.stopAccessingSecurityScopedResource()
                 // 从跟踪列表中移除

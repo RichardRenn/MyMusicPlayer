@@ -1287,6 +1287,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         }
     }
     
+
+    
     // 加载歌词
     private func loadLyrics() {
         print("[MusicListViewController] ===== 开始加载歌词 =====")
@@ -1315,11 +1317,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 
                 // 为歌词加载添加访问权限处理
                 var shouldStopAccess = false
-                if lyricsURL.startAccessingSecurityScopedResource() {
-                    shouldStopAccess = true
-                    print("[MusicListViewController] 成功获取歌词文件临时访问权限")
+                // 只有当文件不在APP沙盒目录时才需要获取访问权限
+                if !FileUtils.isURLInAppSandbox(lyricsURL) {
+                    if lyricsURL.startAccessingSecurityScopedResource() {
+                        shouldStopAccess = true
+                        print("[MusicListViewController] 成功获取歌词文件临时访问权限")
+                    } else {
+                        print("[MusicListViewController] 未能获取歌词文件临时访问权限")
+                    }
                 } else {
-                    print("[MusicListViewController] 未能获取歌词文件临时访问权限")
+                    print("[MusicListViewController] 文件在APP沙盒目录中，无需获取访问权限")
                 }
                 
                 // 尝试解析歌词
@@ -1541,16 +1548,21 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard let url = urls.first else { return }
         
-        // 请求访问权限
-        guard url.startAccessingSecurityScopedResource() else {
-            let alert = UIAlertController(title: "错误", message: "无法获取文件夹访问权限", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "确定", style: .default))
-            present(alert, animated: true)
-            return
+        // 如果不是APP专用文件夹，则需要请求访问权限
+        if !FileUtils.isURLInAppSandbox(url) {
+            guard url.startAccessingSecurityScopedResource() else {
+                let alert = UIAlertController(title: "错误", message: "无法获取文件夹访问权限", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+                present(alert, animated: true)
+                return
+            }
+            
+            // 将权限记录添加到数组中以便稍后释放
+            securityScopedResources.append(url)
+            print("[MusicListViewController] 获取外部文件夹访问权限成功: \(url.lastPathComponent)")
+        } else {
+            print("[MusicListViewController] 检测到APP专用文件夹，无需获取临时权限: \(url.lastPathComponent)")
         }
-        
-        // 将权限记录添加到数组中以便稍后释放
-        securityScopedResources.append(url)
         
         // 先获取文件夹名称
         let folderName = url.lastPathComponent

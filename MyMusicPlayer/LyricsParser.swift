@@ -18,12 +18,17 @@ class LyricsParser {
         print("[LyricsParser] 开始解析歌词文件: \(url.lastPathComponent)")
         
         var shouldStopAccess = false
-        let hasAccess = url.startAccessingSecurityScopedResource()
-        if hasAccess {
-            shouldStopAccess = true
-            print("[LyricsParser] 成功获取歌词文件访问权限: \(url.lastPathComponent)")
+        
+        // 只有当文件不在APP沙盒目录中时才需要获取访问权限
+        if !FileUtils.isURLInAppSandbox(url) {
+            if url.startAccessingSecurityScopedResource() {
+                shouldStopAccess = true
+                print("[LyricsParser] 成功获取歌词文件访问权限: \(url.lastPathComponent)")
+            } else {
+                print("[LyricsParser] 无法获取歌词文件访问权限: \(url.lastPathComponent)，尝试使用备用方式访问")
+            }
         } else {
-            print("[LyricsParser] 无法获取歌词文件访问权限: \(url.lastPathComponent)，尝试使用备用方式访问")
+            print("[LyricsParser] 文件在APP专用目录中，无需获取访问权限: \(url.lastPathComponent)")
         }
         
         var result: [LyricsLine]?
