@@ -16,6 +16,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     private var lyrics: [LyricsLine] = []
     private var currentLyricIndex: Int = 0
     
+    // 主题模式
+    private var currentThemeMode: ThemeMode = .light
+    
     // 主题颜色属性
     private var themeColor: UIColor {
         // 从UserDefaults加载主题颜色
@@ -25,6 +28,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         }
         return .systemBlue // 默认颜色
     }
+    
+    // 毛玻璃效果背景视图
+    private var blurEffectView: UIVisualEffectView?
     
     // UI元素
     
@@ -40,9 +46,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     
     private let bottomBanner: UIView = {
         let view = UIView()
-        // view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
-        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 12
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
         view.isHidden = false
         // 添加阴影效果
         view.layer.shadowColor = UIColor.black.cgColor
@@ -50,6 +56,43 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         view.layer.shadowOffset = CGSize(width: 0, height: -4)
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
+        
+        // 创建模糊效果
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.layer.cornerRadius = 12
+        blurEffectView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        blurEffectView.clipsToBounds = true
+        
+        // 添加带有透明度的覆盖层，保留一点主题色
+        let overlayView = UIView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear // 暂时设置为透明，稍后在updateThemeColorUI中设置主题色
+        overlayView.layer.cornerRadius = 12
+        overlayView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        overlayView.clipsToBounds = true
+        
+        // 为overlayView添加标签，以便后续在updateThemeColorUI中找到它
+        overlayView.tag = 1001
+        
+        // 添加模糊视图和覆盖层
+        view.addSubview(blurEffectView)
+        view.addSubview(overlayView)
+        
+        // 设置约束
+        NSLayoutConstraint.activate([
+            blurEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blurEffectView.topAnchor.constraint(equalTo: view.topAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
         return view
     }()
     
@@ -184,6 +227,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         // 添加左滑手势支持返回功能
         setupSwipeGesture()
         
+        // 加载主题设置
+        loadThemeSetting()
+        
         // 更新UI以使用主题颜色
         updateThemeColorUI()
     }
@@ -233,6 +279,17 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         NotificationCenter.default.removeObserver(self, name: .musicPlayerProgressChanged, object: nil)
     }
     
+    // 加载主题设置
+    private func loadThemeSetting() {
+        let savedValue = UserDefaults.standard.integer(forKey: "themeMode")
+        if let themeMode = ThemeMode(rawValue: savedValue) {
+            currentThemeMode = themeMode
+        } else {
+            // 默认为浅色模式
+            currentThemeMode = .light
+        }
+    }
+    
     // 设置UI
     private func setupUI() {
         // 显示歌曲名 - 艺术家名格式，如果有艺术家信息
@@ -241,7 +298,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         } else {
             title = music.title
         }
-        view.backgroundColor = .systemBackground
+        
+        // 设置毛玻璃背景效果
+        setupBlurBackground()
         
         // 设置导航栏左侧返回按钮
         navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "chevron.backward"), style: .plain, target: self, action: #selector(backButtonTapped))
@@ -273,10 +332,9 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
 
         bottomBanner.addSubview(allButtonsStack)
 
-        // 为底部横幅添加悬浮样式和圆角
-        // bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
-        bottomBanner.backgroundColor = .systemBackground
-        // 添加阴影效果
+        // 底部横幅
+        bottomBanner.backgroundColor = .clear // 透明背景，用于显示毛玻璃效果
+        // 底部横幅 - 添加阴影悬浮效果
         bottomBanner.layer.shadowColor = UIColor.black.cgColor
         bottomBanner.layer.shadowOpacity = 0.1
         bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -4)
@@ -284,6 +342,8 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         bottomBanner.clipsToBounds = false
         bottomBanner.layer.cornerRadius = 12 // 让视图的角变圆，半径
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
+        
+        // 底部横幅背景已设置为透明，将显示视图背景的毛玻璃效果
         
         // 设置约束
         NSLayoutConstraint.activate([
@@ -533,8 +593,95 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
         playModeButton.tintColor = themeColor
         rangeLockButton.tintColor = themeColor
         
+        // 更新底部横幅中的覆盖层颜色
+        if let overlayView = bottomBanner.viewWithTag(1001) as? UIView {
+            overlayView.backgroundColor = themeColor.withAlphaComponent(0.1)
+        }
+        
         // 更新歌词表格视图
         tableView.reloadData()
+        
+        // 更新毛玻璃背景效果
+        updateBlurBackground()
+    }
+    
+    // 设置毛玻璃背景效果
+    private func setupBlurBackground() {
+        // 先移除旧的毛玻璃视图
+        blurEffectView?.removeFromSuperview()
+        
+        // 根据当前主题模式选择模糊效果风格
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView?.frame = view.bounds
+        blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 将毛玻璃视图添加到最底层
+        view.insertSubview(blurEffectView!, at: 0)
+        
+        // 初始更新毛玻璃背景颜色
+        updateBlurBackground()
+    }
+    
+    // 更新毛玻璃背景颜色
+    private func updateBlurBackground() {
+        guard let blurEffectView = blurEffectView else { return }
+        
+        // 根据当前主题模式选择模糊效果风格和背景颜色
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView.effect = blurEffect
+        
+        // 根据当前 主题模式选择对应的主题色
+        let backgroundColor: UIColor
+        if currentThemeMode == .light {
+            backgroundColor = createLightThemeColor(baseColor: themeColor)
+        } else {
+            backgroundColor = createDarkThemeColor(baseColor: themeColor)
+        }
+        // 创建带颜色的视图覆盖在毛玻璃上
+        let colorView = UIView(frame: blurEffectView.bounds)
+        colorView.backgroundColor = backgroundColor
+        colorView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 移除旧的颜色视图
+        blurEffectView.contentView.subviews.forEach { $0.removeFromSuperview() }
+        
+        // 添加新的颜色视图
+        blurEffectView.contentView.addSubview(colorView)
+    }
+    
+    // 根据基础颜色创建浅色主题色
+    private func createLightThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建浅色版本，降低饱和度，提高亮度
+        // 混合白色和基础颜色，使用85%的白色和15%的基础颜色
+        let lightR = 0.85 * 1.0 + 0.15 * r
+        let lightG = 0.85 * 1.0 + 0.15 * g
+        let lightB = 0.85 * 1.0 + 0.15 * b
+        
+        // 设置透明度为0.7，确保毛玻璃效果可见
+        return UIColor(red: lightR, green: lightG, blue: lightB, alpha: 0.7)
+    }
+
+    // 根据基础颜色创建深色主题色
+    private func createDarkThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建深色版本，降低亮度，增加饱和度
+        // 混合黑色和基础颜色，使用85%的黑色和15%的基础颜色
+        let darkR = 0.85 * 0.0 + 0.25 * r
+        let darkG = 0.85 * 0.0 + 0.25 * g
+        let darkB = 0.85 * 0.0 + 0.25 * b
+        
+        // 设置透明度为0.7，确保背景足够深色并适合深色模式
+        return UIColor(red: darkR, green: darkG, blue: darkB, alpha: 0.7)
     }
     
     private func updateUI() {

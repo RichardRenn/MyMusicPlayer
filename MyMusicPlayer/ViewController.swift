@@ -18,6 +18,13 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     // UI元素
     // 主题颜色，默认为.systemBlue，在viewDidLoad中加载保存的设置
     private var themeColor: UIColor = .systemBlue
+    
+    // 主题模式
+    private var currentThemeMode: ThemeMode = .light
+    
+    // 毛玻璃效果背景视图
+    private var blurEffectView: UIVisualEffectView?
+    
     private var scanningAppFolder = false
     
     private var helpButton: UIButton = {
@@ -137,6 +144,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         scanProgressView.progressTintColor = themeColor
         helpButton.setTitleColor(themeColor, for: .normal)
         
+        // 更新毛玻璃背景颜色
+        updateBlurBackground()
+        
         // 设置初始提示文本
         tipsLabel.text = tipsArray[0]
         
@@ -235,6 +245,100 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
             // 如果没有保存的设置，默认为浅色模式
             self.overrideUserInterfaceStyle = .light
         }
+        
+        // 加载主题模式设置
+        loadThemeSetting()
+    }
+    
+    // 加载主题设置
+    private func loadThemeSetting() {
+        let savedValue = UserDefaults.standard.integer(forKey: "themeMode")
+        if let themeMode = ThemeMode(rawValue: savedValue) {
+            currentThemeMode = themeMode
+        } else {
+            // 默认为浅色模式
+            currentThemeMode = .light
+        }
+        print("[ViewController] [主题设置] 已加载保存的主题模式：\(currentThemeMode)")
+    }
+    
+    // 设置毛玻璃背景效果
+    private func setupBlurBackground() {
+        // 先移除旧的毛玻璃视图
+        blurEffectView?.removeFromSuperview()
+        
+        // 根据当前主题模式选择模糊效果风格
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView?.frame = view.bounds
+        blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 将毛玻璃视图添加到最底层
+        view.insertSubview(blurEffectView!, at: 0)
+        
+        // 初始更新毛玻璃背景颜色
+        updateBlurBackground()
+    }
+    
+    // 更新毛玻璃背景颜色
+    private func updateBlurBackground() {
+        guard let blurEffectView = blurEffectView else { return }
+        
+        // 根据当前主题模式选择模糊效果风格和背景颜色
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView.effect = blurEffect
+        
+        // 根据当前 主题模式选择对应的主题色
+        let backgroundColor: UIColor
+        if currentThemeMode == .light {
+            backgroundColor = createLightThemeColor(baseColor: themeColor)
+        } else {
+            backgroundColor = createDarkThemeColor(baseColor: themeColor)
+        }
+        // 创建带颜色的视图覆盖在毛玻璃上
+        let colorView = UIView(frame: blurEffectView.bounds)
+        colorView.backgroundColor = backgroundColor
+        colorView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 移除旧的颜色视图
+        blurEffectView.contentView.subviews.forEach { $0.removeFromSuperview() }
+        
+        // 添加新的颜色视图
+        blurEffectView.contentView.addSubview(colorView)
+    }
+    
+    // 根据基础颜色创建浅色主题色
+    private func createLightThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建浅色版本，降低饱和度，提高亮度
+        // 混合白色和基础颜色，使用85%的白色和15%的基础颜色
+        let lightR = 0.85 * 1.0 + 0.15 * r
+        let lightG = 0.85 * 1.0 + 0.15 * g
+        let lightB = 0.85 * 1.0 + 0.15 * b
+        
+        // 设置透明度为0.7，确保毛玻璃效果可见
+        return UIColor(red: lightR, green: lightG, blue: lightB, alpha: 0.7)
+    }
+
+    // 根据基础颜色创建深色主题色
+    private func createDarkThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建深色版本，降低亮度，增加饱和度
+        // 混合黑色和基础颜色，使用85%的黑色和15%的基础颜色
+        let darkR = 0.85 * 0.0 + 0.25 * r
+        let darkG = 0.85 * 0.0 + 0.25 * g
+        let darkB = 0.85 * 0.0 + 0.25 * b
+        
+        // 设置透明度为0.7，确保背景足够深色并适合深色模式
+        return UIColor(red: darkR, green: darkG, blue: darkB, alpha: 0.7)
     }
     
     // 检查是否有已保存的音乐列表
@@ -550,7 +654,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     
     // 设置UI
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        
+        // 设置毛玻璃背景效果
+        setupBlurBackground()
         
         // 添加UI元素
         view.addSubview(titleLabel)
@@ -821,11 +927,14 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        // 重新加载主题颜色
+        // 重新加载主题设置，确保从其他页面返回时主题正确更新
+        loadThemeSetting()
+        loadSavedTheme()
         themeColor = loadThemeColorSetting()
-        // 应用主题颜色到按钮和进度条
         selectButton.backgroundColor = themeColor
         scanProgressView.progressTintColor = themeColor
+        helpButton.setTitleColor(themeColor, for: .normal)
+        updateBlurBackground()
         
         // 根据是否已选择过文件夹控制按钮和扫描提示的可见性
         selectButton.isHidden = hasSelectedDirectory

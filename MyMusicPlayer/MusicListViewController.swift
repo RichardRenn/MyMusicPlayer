@@ -49,11 +49,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 主题相关
     private var currentThemeMode: ThemeMode = .light
     
+    // 表格视图底部约束（动态调整）
+    private var tableViewBottomConstraint: NSLayoutConstraint?
+    
     // 主题颜色设置
     private var themeColor: UIColor = .systemBlue { 
         didSet {
             saveThemeColorSetting()
             updateThemeColorUI()
+            updateBlurBackground()
         }
     }
     
@@ -69,6 +73,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 设置菜单是否展开
     private var isSettingsMenuExpanded = false
     private var directoryProgresses: [Float] = [] // 存储各目录的扫描进度
+    
+    // 毛玻璃背景视图
+    private var blurEffectView: UIVisualEffectView!
     
     // UI元素
     // 展开/收起歌词按钮
@@ -92,18 +99,53 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 歌词面板
     private let lyricsPanel: UIView = {
         let view = UIView()
-        // view.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.98) // 与底部横幅统一背景色
-        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
         view.layer.cornerRadius = 12
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只设置顶部两个角为圆角
-        // 添加阴影效果
+        // 歌词面板 - 添加阴影悬浮效果
         view.layer.shadowColor = UIColor.black.cgColor
         view.layer.shadowOpacity = 0.1
         view.layer.shadowOffset = CGSize(width: 0, height: -4)
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
+        
+        // 创建模糊效果
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.layer.cornerRadius = 12
+        blurEffectView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        blurEffectView.clipsToBounds = true
+        
+        // 添加带有透明度的覆盖层，保留一点主题色
+        let overlayView = UIView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear // 暂时设置为透明，稍后在updateThemeColorUI中设置主题色
+        overlayView.layer.cornerRadius = 12
+        overlayView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        overlayView.clipsToBounds = true
+        
+        // 为overlayView添加标签，以便后续在updateThemeColorUI中找到它
+        overlayView.tag = 1001
+        
+        // 添加模糊视图和覆盖层
+        view.addSubview(blurEffectView)
+        view.addSubview(overlayView)
+        
+        // 设置约束
+        NSLayoutConstraint.activate([
+            blurEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blurEffectView.topAnchor.constraint(equalTo: view.topAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
         return view
     }()
     
@@ -123,14 +165,15 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let tableView = UITableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
+        tableView.separatorStyle = .none
         return tableView
     }()
     
     private let bottomBanner: UIView = {
         let view = UIView()
-        // view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98)
-        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 12
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
         view.isHidden = true
         // 添加阴影效果
         view.layer.shadowColor = UIColor.black.cgColor
@@ -138,6 +181,44 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.layer.shadowOffset = CGSize(width: 0, height: -4)
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
+        
+        // 创建模糊效果
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.layer.cornerRadius = 12
+        blurEffectView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        blurEffectView.clipsToBounds = true
+        
+        // 添加带有透明度的覆盖层，保留一点主题色
+        let overlayView = UIView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear // 暂时设置为透明，稍后在updateThemeColorUI中设置主题色
+        overlayView.layer.cornerRadius = 12
+        overlayView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        overlayView.clipsToBounds = true
+        
+        // 为overlayView添加标签，以便后续在updateThemeColorUI中找到它
+        overlayView.tag = 1001
+        
+        // 添加模糊视图和覆盖层
+        view.addSubview(blurEffectView)
+        view.addSubview(overlayView)
+        
+        // 设置约束
+        NSLayoutConstraint.activate([
+            blurEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blurEffectView.topAnchor.constraint(equalTo: view.topAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        
         return view
     }()
     
@@ -394,14 +475,16 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
     // 设置UI
     private func setupUI() {
         title = "音乐库"
-        view.backgroundColor = .systemBackground
+        
+        // 设置毛玻璃背景
+        setupBlurBackground()
         
         // 加载保存的设置
         loadThemeSetting()
         loadFolderIconSetting()
         applyTheme()
         
-        // 设置导航栏左侧按钮（加号按钮和刷新按钮），受眼镜开关控制
+        // 设置导航栏左侧按钮（加号按钮和刷新按钮）
         updateLeftBarButtonsVisibility()
         
         // 设置导航栏右侧按钮（眼镜图标按钮和主题切换按钮）
@@ -413,6 +496,12 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         view.addSubview(tableView)
         tableView.delegate = self
         tableView.dataSource = self
+        // 设置表格视图背景为透明，显示下面的毛玻璃效果
+        tableView.backgroundColor = .clear
+        tableView.backgroundView = nil
+        // 已在初始化时设置无分隔线，移除以下分隔线相关设置
+        // tableView.separatorEffect = UIVibrancyEffect(blurEffect: UIBlurEffect(style: .systemMaterialLight))
+        // tableView.separatorColor = UIColor.systemGray.withAlphaComponent(0.3)
         
         // 添加歌词面板（放在歌词面板容器中添加）
         view.addSubview(lyricsContainer)
@@ -448,10 +537,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         bottomBanner.addSubview(allButtonsStack)
         
-        // 为底部横幅添加悬浮样式和圆角
-        // bottomBanner.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.98) // 添加半透明背景色
-        bottomBanner.backgroundColor = .systemBackground
-        // 添加阴影效果
+        // 底部横幅
+        bottomBanner.backgroundColor = .clear
+        // 底部横幅 - 添加阴影悬浮效果
         bottomBanner.layer.shadowColor = UIColor.black.cgColor
         bottomBanner.layer.shadowOpacity = 0.1
         bottomBanner.layer.shadowOffset = CGSize(width: 0, height: -4)
@@ -461,13 +549,24 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         bottomBanner.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner] // 初始状态设置为四个角都是圆角，后续会根据歌词展开状态动态调整
         
         // 设置约束 - 全部使用百分比实现自适应布局
+        // 设置歌词面板和表格背景为透明，显示毛玻璃效果
+        lyricsPanel.backgroundColor = .clear
+        lyricsTableView.backgroundColor = .clear
+        lyricsTableView.backgroundView = nil
+        
+        // 表格视图基本约束
         NSLayoutConstraint.activate([
-            // 表格视图 - 底部连接到底部横幅的顶部，确保不超过横幅底部
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: bottomBanner.bottomAnchor),
-            
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        
+        // 创建底部约束并激活
+        tableViewBottomConstraint = tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        tableViewBottomConstraint?.isActive = true
+        
+        // 激活其他约束
+        NSLayoutConstraint.activate([
             // 展开/收起按钮
             expandButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             expandButton.widthAnchor.constraint(equalToConstant: 60), // 扩大宽度以增加可点击区域
@@ -478,14 +577,18 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             lyricsPanel.leadingAnchor.constraint(equalTo: lyricsContainer.leadingAnchor),
             lyricsPanel.trailingAnchor.constraint(equalTo: lyricsContainer.trailingAnchor),
             lyricsPanel.bottomAnchor.constraint(equalTo: lyricsContainer.bottomAnchor),
-            lyricsPanel.topAnchor.constraint(equalTo: lyricsContainer.topAnchor),
-            
+            lyricsPanel.topAnchor.constraint(equalTo: lyricsContainer.topAnchor)
+        ])
+        
+        // 激活更多约束
+        NSLayoutConstraint.activate([
             // 歌词面板容器 - 与底部横幅融合
             lyricsContainer.leadingAnchor.constraint(equalTo: bottomBanner.leadingAnchor),
             lyricsContainer.trailingAnchor.constraint(equalTo: bottomBanner.trailingAnchor),
             lyricsContainer.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor), // 直接连接到底部横幅顶部
             lyricsContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.17), // 歌词面板高度/屏幕高度占比
-            // 歌词表格视图
+            
+            // 歌词表格视图约束
             lyricsTableView.topAnchor.constraint(equalTo: lyricsPanel.topAnchor),
             lyricsTableView.leadingAnchor.constraint(equalTo: lyricsPanel.leadingAnchor),
             lyricsTableView.trailingAnchor.constraint(equalTo: lyricsPanel.trailingAnchor),
@@ -892,22 +995,60 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         navigationItem.leftBarButtonItems = [editButton]
     }
     
-    // 编辑面板视图
     // 设置面板
     private lazy var settingsPanel: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
         view.layer.cornerRadius = 12
         // 仅保留左下角、右下角、左上角的圆角
         view.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMinXMinYCorner]
-        view.isHidden = true
-        // 添加阴影效果
+        // 设置面板 - 添加阴影悬浮效果
         view.layer.shadowColor = UIColor.black.cgColor
         view.layer.shadowOpacity = 0.1
         view.layer.shadowOffset = CGSize(width: 0, height: 4)
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
+        
+        // 添加模糊效果
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.layer.cornerRadius = 12
+        blurEffectView.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMinXMinYCorner]
+        blurEffectView.clipsToBounds = true
+        
+        // 添加带有透明度的覆盖层，保留一点主题色
+        let overlayView = UIView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear // 暂时设置为透明，稍后在updateThemeColorUI中设置主题色
+        overlayView.layer.cornerRadius = 12
+        overlayView.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMinXMinYCorner]
+        overlayView.clipsToBounds = true
+        
+        // 为overlayView添加标签，以便后续在updateThemeColorUI中找到它
+        overlayView.tag = 1001
+        
+        // 添加模糊效果视图到主视图
+        view.addSubview(blurEffectView)
+        view.addSubview(overlayView)
+        
+        // 设置模糊效果视图约束
+        NSLayoutConstraint.activate([
+            blurEffectView.topAnchor.constraint(equalTo: view.topAnchor),
+            blurEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // 确保模糊效果视图在最底层，覆盖层在中间
+        view.sendSubviewToBack(blurEffectView)
+        blurEffectView.superview?.sendSubviewToBack(blurEffectView)
         
         // 全局图标切换按钮
         let showIconToggleButton = UIButton(type: .system)
@@ -947,35 +1088,75 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
             showIconToggleButton.heightAnchor.constraint(equalToConstant: 40),
             
             themeToggleButton.topAnchor.constraint(equalTo: showIconToggleButton.bottomAnchor, constant: 8),
-             themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-             themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-             themeToggleButton.heightAnchor.constraint(equalToConstant: 40),
-             
-             // 颜色调整按钮约束
-             colorAdjustButton.topAnchor.constraint(equalTo: themeToggleButton.bottomAnchor, constant: 8),
-             colorAdjustButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-             colorAdjustButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-             colorAdjustButton.heightAnchor.constraint(equalToConstant: 40),
-             colorAdjustButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
+            themeToggleButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            themeToggleButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            themeToggleButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            // 颜色调整按钮约束
+            colorAdjustButton.topAnchor.constraint(equalTo: themeToggleButton.bottomAnchor, constant: 8),
+            colorAdjustButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            colorAdjustButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            colorAdjustButton.heightAnchor.constraint(equalToConstant: 40),
+            colorAdjustButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
         ])
         
         return view
     }()
     
-    private lazy var editPanel: UIView = {
+    // 编辑面板
+    private let editPanel: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
         view.layer.cornerRadius = 12
         // 仅保留左下角、右下角、右上角的圆角
         view.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMaxXMinYCorner]
-        view.isHidden = true
-        // 添加阴影效果
+        // 编辑面板 - 添加阴影悬浮效果
         view.layer.shadowColor = UIColor.black.cgColor
-        view.layer.shadowOpacity = 0.1
+        view.layer.shadowOpacity = 0.1 // 阴影透明度
         view.layer.shadowOffset = CGSize(width: 0, height: 4)
         view.layer.shadowRadius = 8
         view.clipsToBounds = false
+        
+        // 添加模糊效果
+        let blurEffect = UIBlurEffect(style: .systemMaterial)
+        let blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        blurEffectView.layer.cornerRadius = 12
+        blurEffectView.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMaxXMinYCorner]
+        blurEffectView.clipsToBounds = true
+        
+        // 添加带有透明度的覆盖层，保留一点主题色
+        let overlayView = UIView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear // 暂时设置为透明，稍后在updateThemeColorUI中设置主题色
+        overlayView.layer.cornerRadius = 12
+        overlayView.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner, .layerMaxXMinYCorner]
+        overlayView.clipsToBounds = true
+        
+        // 为overlayView添加标签，以便后续在updateThemeColorUI中找到它
+        overlayView.tag = 1001
+        
+        // 添加模糊效果视图到主视图
+        view.addSubview(blurEffectView)
+        view.addSubview(overlayView)
+        
+        // 设置模糊效果视图约束
+        NSLayoutConstraint.activate([
+            blurEffectView.topAnchor.constraint(equalTo: view.topAnchor),
+            blurEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            overlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            overlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // 确保模糊效果视图在最底层，覆盖层在中间
+        view.sendSubviewToBack(blurEffectView)
+        blurEffectView.superview?.sendSubviewToBack(blurEffectView)
         
         // 添加文件夹按钮
         let addFolderButton = UIButton(type: .system)
@@ -1110,6 +1291,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 应用新主题
         applyTheme()
+
+        // 重新设置毛玻璃背景
+        setupBlurBackground()
         
         // 更新主题按钮文本
         updateThemeColorUI()
@@ -1136,6 +1320,85 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
            let savedColor = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(colorData) as? UIColor {
             themeColor = savedColor
         }
+    }
+    
+    // 设置毛玻璃背景效果
+    private func setupBlurBackground() {
+        // 先移除旧的毛玻璃视图
+        blurEffectView?.removeFromSuperview()
+        
+        // 根据当前主题模式选择模糊效果风格
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
+        blurEffectView?.frame = view.bounds
+        blurEffectView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 将毛玻璃视图添加到最底层
+        view.insertSubview(blurEffectView!, at: 0)
+        
+        // 初始更新毛玻璃背景颜色
+        updateBlurBackground()
+    }
+    
+    // 更新毛玻璃背景颜色
+    private func updateBlurBackground() {
+        guard let blurEffectView = blurEffectView else { return }
+        
+        // 根据当前主题模式选择模糊效果风格和背景颜色
+        let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
+        let blurEffect = UIBlurEffect(style: blurEffectStyle)
+        blurEffectView.effect = blurEffect
+        
+        // 根据当前 主题模式选择对应的主题色
+        let backgroundColor: UIColor
+        if currentThemeMode == .light {
+            backgroundColor = createLightThemeColor(baseColor: themeColor)
+        } else {
+            backgroundColor = createDarkThemeColor(baseColor: themeColor)
+        }
+        // 创建带颜色的视图覆盖在毛玻璃上
+        let colorView = UIView(frame: blurEffectView.bounds)
+        colorView.backgroundColor = backgroundColor
+        colorView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // 移除旧的颜色视图
+        blurEffectView.contentView.subviews.forEach { $0.removeFromSuperview() }
+        
+        // 添加新的颜色视图
+        blurEffectView.contentView.addSubview(colorView)
+    }
+    
+    // 根据基础颜色创建浅色主题色
+    private func createLightThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建浅色版本，降低饱和度，提高亮度
+        // 混合白色和基础颜色，使用85%的白色和15%的基础颜色
+        let lightR = 0.85 * 1.0 + 0.15 * r
+        let lightG = 0.85 * 1.0 + 0.15 * g
+        let lightB = 0.85 * 1.0 + 0.15 * b
+        
+        // 设置透明度为0.7，确保毛玻璃效果可见
+        return UIColor(red: lightR, green: lightG, blue: lightB, alpha: 0.7)
+    }
+
+    // 根据基础颜色创建深色主题色
+    private func createDarkThemeColor(baseColor: UIColor) -> UIColor {
+        // 获取基础颜色的RGB值
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        // 创建深色版本，降低亮度，增加饱和度
+        // 混合黑色和基础颜色，使用85%的黑色和15%的基础颜色
+        let darkR = 0.85 * 0.0 + 0.25 * r
+        let darkG = 0.85 * 0.0 + 0.25 * g
+        let darkB = 0.85 * 0.0 + 0.25 * b
+        
+        // 设置透明度为0.7，确保背景足够深色并适合深色模式
+        return UIColor(red: darkR, green: darkG, blue: darkB, alpha: 0.7)
     }
     
     private func updateThemeColorUI() {
@@ -1170,6 +1433,26 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
                 themeButton.setTitle(currentThemeMode == .light ? "深色模式" : "浅色模式", for: .normal)
                 themeButton.layoutIfNeeded() // 确保立即刷新布局
             }
+        }
+        
+        // 更新底部横幅中的覆盖层颜色
+        if let overlayView = bottomBanner.viewWithTag(1001) as? UIView {
+            overlayView.backgroundColor = themeColor.withAlphaComponent(0.1)
+        }
+        
+        // 更新歌词面板中的覆盖层颜色
+        if let overlayView = lyricsPanel.viewWithTag(1001) as? UIView {
+            overlayView.backgroundColor = themeColor.withAlphaComponent(0.1)
+        }
+        
+        // 更新编辑面板中的覆盖层颜色
+        if let overlayView = editPanel.viewWithTag(1001) as? UIView {
+            overlayView.backgroundColor = themeColor.withAlphaComponent(0.1)
+        }
+        
+        // 更新设置面板中的覆盖层颜色
+        if let overlayView = settingsPanel.viewWithTag(1001) as? UIView {
+            overlayView.backgroundColor = themeColor.withAlphaComponent(0.1)
         }
         
         // 更新设置面板中的所有按钮文字颜色
@@ -1252,27 +1535,81 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         let imageName = isLyricsExpanded ? "chevron.down" : "chevron.up"
         expandButton.setImage(UIImage(systemName: imageName), for: .normal)
 
+        let bottomOnlyCorners: CACornerMask = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        let allCorners: CACornerMask = [
+            .layerMinXMinYCorner, .layerMaxXMinYCorner,
+            .layerMinXMaxYCorner, .layerMaxXMaxYCorner
+        ]
+        
         if isLyricsExpanded {
             lyricsContainer.isHidden = false
             lyricsPanel.isHidden = false
             lyricsPanel.alpha = 1.0
             lyricsPanel.transform = .identity
-            bottomBanner.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-            view.layoutIfNeeded()
-            loadLyricsIfNeeded()
+            
+            // 更新bottomBanner及其内部视图的圆角设置
+            bottomBanner.layer.maskedCorners = bottomOnlyCorners
+            
+            // 更新内部的blurEffectView和overlayView的圆角
+            for subview in bottomBanner.subviews {
+                if let visualEffectView = subview as? UIVisualEffectView {
+                    visualEffectView.layer.maskedCorners = bottomOnlyCorners
+                } else if let overlayView = subview as? UIView, overlayView.tag == 1001 {
+                    overlayView.layer.maskedCorners = bottomOnlyCorners
+                }
+            }
+            
         } else {
             lyricsPanel.alpha = 1.0
             lyricsPanel.transform = .identity
-            bottomBanner.layer.maskedCorners = [
-                .layerMinXMinYCorner, .layerMaxXMinYCorner,
-                .layerMinXMaxYCorner, .layerMaxXMaxYCorner
-            ]
-            view.layoutIfNeeded()
+            
+            // 更新bottomBanner及其内部视图的圆角设置
+            bottomBanner.layer.maskedCorners = allCorners
+            
+            // 更新内部的blurEffectView和overlayView的圆角
+            for subview in bottomBanner.subviews {
+                if let visualEffectView = subview as? UIVisualEffectView {
+                    visualEffectView.layer.maskedCorners = allCorners
+                } else if let overlayView = subview as? UIView, overlayView.tag == 1001 {
+                    overlayView.layer.maskedCorners = allCorners
+                }
+            }
+            
             lyricsContainer.isHidden = true
             lyricsPanel.isHidden = true
         }
+        
+        // 更新表格视图底部约束
+        updateTableViewBottomConstraint()
+        view.layoutIfNeeded()
+        
+        // 加载歌词
+        if isLyricsExpanded {
+            loadLyricsIfNeeded()
+        }
     }
 
+    // 更新表格视图底部约束
+    private func updateTableViewBottomConstraint() {
+        // 先停用当前约束
+        tableViewBottomConstraint?.isActive = false
+        
+        // 根据底部横幅和歌词面板的显示状态调整约束
+        if bottomBanner.isHidden {
+            // 当横幅未显示时，表格视图底部等于页面的底部
+            tableViewBottomConstraint = tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        } else if isLyricsExpanded {
+            // 当横幅显示且歌词面板展开时，表格视图底部等于歌词面板的顶部
+            tableViewBottomConstraint = tableView.bottomAnchor.constraint(equalTo: lyricsContainer.topAnchor)
+        } else {
+            // 当横幅显示且歌词面板未展开时，表格视图底部等于横幅的顶部
+            tableViewBottomConstraint = tableView.bottomAnchor.constraint(equalTo: bottomBanner.topAnchor)
+        }
+        
+        // 激活新约束
+        tableViewBottomConstraint?.isActive = true
+    }
+    
     // 辅助：加载歌词逻辑抽出
     private func loadLyricsIfNeeded() {
         if let currentMusic = musicPlayer.currentMusic {
@@ -1391,6 +1728,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         if let currentMusic = musicPlayer.currentMusic {
             bottomBanner.isHidden = false
             expandButton.isHidden = false // 有歌曲播放时显示展开按钮
+            
+            // 更新表格视图底部约束
+            updateTableViewBottomConstraint()
             // 显示歌曲名 - 艺术家名格式，如果有艺术家信息
             if !currentMusic.artist.isEmpty && currentMusic.artist != "Unknown Artist" {
                 songTitleLabel.text = "\(currentMusic.title) - \(currentMusic.artist)"
@@ -1441,6 +1781,9 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         } else {
             bottomBanner.isHidden = true
             expandButton.isHidden = true // 没有歌曲播放时隐藏展开按钮
+            
+            // 更新表格视图底部约束
+            updateTableViewBottomConstraint()
             stopUpdateTimer()
         }
     }
@@ -1701,6 +2044,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 处理音乐列表单元格
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
+        // 设置单元格背景为透明，显示毛玻璃效果
+        cell.backgroundColor = .clear
         
         // 获取显示项
         let item = displayItems[indexPath.row]
