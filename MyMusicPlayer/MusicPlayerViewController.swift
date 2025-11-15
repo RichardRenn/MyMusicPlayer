@@ -628,60 +628,76 @@ class MusicPlayerViewController: UIViewController, UITableViewDelegate, UITableV
     private func updateBlurBackground() {
         guard let blurEffectView = blurEffectView else { return }
         
-        // 根据当前主题模式选择模糊效果风格和背景颜色
+        // 确保模糊视图有正确的尺寸
+        blurEffectView.frame = view.bounds
+        
+        // 根据当前主题模式选择模糊效果风格
         let blurEffectStyle: UIBlurEffect.Style = currentThemeMode == .light ? .light : .dark
         let blurEffect = UIBlurEffect(style: blurEffectStyle)
         blurEffectView.effect = blurEffect
         
-        // 根据当前 主题模式选择对应的主题色
-        let backgroundColor: UIColor
+        // 根据当前主题模式选择对应的主题色 - 使用更明显的颜色差异来测试渐变效果
+        let topColor: UIColor
+        let bottomColor: UIColor
         if currentThemeMode == .light {
-            backgroundColor = createLightThemeColor(baseColor: themeColor)
+            // 浅色主题：顶部颜色更深，底部颜色更浅
+            topColor = createLightThemeColor(baseColor: themeColor, alpha: 0.8)
+            bottomColor = createLightThemeColor(baseColor: themeColor, alpha: 0.2)
         } else {
-            backgroundColor = createDarkThemeColor(baseColor: themeColor)
+            // 深色主题：顶部颜色更深，底部颜色更浅
+            topColor = createDarkThemeColor(baseColor: themeColor, alpha: 0.8)
+            bottomColor = createDarkThemeColor(baseColor: themeColor, alpha: 0.2)
         }
-        // 创建带颜色的视图覆盖在毛玻璃上
-        let colorView = UIView(frame: blurEffectView.bounds)
-        colorView.backgroundColor = backgroundColor
-        colorView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
         // 移除旧的颜色视图
         blurEffectView.contentView.subviews.forEach { $0.removeFromSuperview() }
         
-        // 添加新的颜色视图
-        blurEffectView.contentView.addSubview(colorView)
+        // 直接在contentView上创建渐变色层
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.frame = blurEffectView.contentView.bounds
+        gradientLayer.colors = [topColor.cgColor, bottomColor.cgColor]
+        gradientLayer.locations = [0.0, 1.0]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        
+        // 确保图层数组为空再添加
+        blurEffectView.contentView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        blurEffectView.contentView.layer.addSublayer(gradientLayer)
+        
+        // 设置zPosition确保渐变层在正确的层级
+        gradientLayer.zPosition = -1
     }
     
-    // 根据基础颜色创建浅色主题色
-    private func createLightThemeColor(baseColor: UIColor) -> UIColor {
+    // 根据基础颜色创建浅色主题色，并支持自定义透明度
+    private func createLightThemeColor(baseColor: UIColor, alpha: CGFloat = 1.0) -> UIColor {
         // 获取基础颜色的RGB值
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
         
         // 创建浅色版本，降低饱和度，提高亮度
         // 混合白色和基础颜色，使用85%的白色和15%的基础颜色
-        let lightR = 0.85 * 1.0 + 0.15 * r
-        let lightG = 0.85 * 1.0 + 0.15 * g
-        let lightB = 0.85 * 1.0 + 0.15 * b
+        let lightR = 0.4 * 1.0 + 0.4 * r
+        let lightG = 0.4 * 1.0 + 0.4 * g
+        let lightB = 0.4 * 1.0 + 0.4 * b
         
-        // 设置透明度为0.7，确保毛玻璃效果可见
-        return UIColor(red: lightR, green: lightG, blue: lightB, alpha: 0.7)
+        // 使用传入的透明度
+        return UIColor(red: lightR, green: lightG, blue: lightB, alpha: alpha)
     }
 
-    // 根据基础颜色创建深色主题色
-    private func createDarkThemeColor(baseColor: UIColor) -> UIColor {
+    // 根据基础颜色创建深色主题色，并支持自定义透明度
+    private func createDarkThemeColor(baseColor: UIColor, alpha: CGFloat = 1.0) -> UIColor {
         // 获取基础颜色的RGB值
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         baseColor.getRed(&r, green: &g, blue: &b, alpha: &a)
         
         // 创建深色版本，降低亮度，增加饱和度
         // 混合黑色和基础颜色，使用85%的黑色和15%的基础颜色
-        let darkR = 0.85 * 0.0 + 0.25 * r
-        let darkG = 0.85 * 0.0 + 0.25 * g
-        let darkB = 0.85 * 0.0 + 0.25 * b
+        let darkR = 0.0 * 0.0 + 0.4 * r
+        let darkG = 0.0 * 0.0 + 0.4 * g
+        let darkB = 0.0 * 0.0 + 0.4 * b
         
-        // 设置透明度为0.7，确保背景足够深色并适合深色模式
-        return UIColor(red: darkR, green: darkG, blue: darkB, alpha: 0.7)
+        // 使用传入的透明度
+        return UIColor(red: darkR, green: darkG, blue: darkB, alpha: alpha)
     }
     
     private func updateUI() {
