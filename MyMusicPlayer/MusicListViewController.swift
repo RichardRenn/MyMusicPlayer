@@ -2137,7 +2137,8 @@ class MusicListViewController: UIViewController, UITableViewDelegate, UITableVie
         
         // 检查是否是歌词表格
         if tableView == lyricsTableView {
-            // 歌词表格不需要处理点击事件
+            // 点击歌词表格，跳转到播放详情页
+            bottomBannerTapped()
             return
         }
         
